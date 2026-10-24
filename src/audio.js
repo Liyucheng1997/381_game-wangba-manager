@@ -68,6 +68,50 @@ export class Sound {
     }
   }
 
+  // 背景音乐：慢节奏 lo-fi，程序合成（Am - F - C - G）
+  startMusic() {
+    if (!this.ctx || this.musicOn) return;
+    this.musicOn = true;
+    if (!this.musicGain) {
+      this.musicGain = this.ctx.createGain();
+      this.musicGain.gain.value = 0.32;
+      const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2400;
+      this.musicGain.connect(lp); lp.connect(this.master);
+    }
+    this.musicGain.gain.setTargetAtTime(0.32, this.ctx.currentTime, 0.5);
+    const bpm = 76, beat = 60 / bpm;
+    const chords = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]];
+    const scale = [57, 60, 62, 64, 67, 69, 72, 74, 76];
+    const f = (m) => 440 * Math.pow(2, (m - 69) / 12);
+    let next = this.ctx.currentTime + 0.1, step = 0;
+    const note = (freq, t, dur, type, vol) => {
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = type; o.frequency.value = freq;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(this.musicGain); o.start(t); o.stop(t + dur + 0.05);
+    };
+    const tick = () => {
+      if (!this.musicOn) return;
+      while (next < this.ctx.currentTime + 0.4) {
+        const bar = Math.floor(step / 8) % 4, sub = step % 8;
+        const ch = chords[bar];
+        if (sub === 0) { ch.forEach((m) => note(f(m), next, beat * 3.8, 'triangle', 0.035)); note(f(ch[0] - 12), next, beat * 1.8, 'sine', 0.09); }
+        if (sub === 4) note(f(ch[0] - 12), next, beat * 1.6, 'sine', 0.07);
+        if (sub % 2 === 0 && Math.random() < 0.55) note(f(scale[Math.floor(Math.random() * scale.length)]), next, beat * 0.9, 'sine', 0.045);
+        if (sub === 2 || sub === 6) this.noise(0.05, { vol: 0.025, freq: 7000, q: 1, at: next - this.ctx.currentTime });
+        next += beat / 2; step++;
+      }
+      this.musicT = setTimeout(tick, 120);
+    };
+    tick();
+  }
+  stopMusic() {
+    this.musicOn = false;
+    clearTimeout(this.musicT);
+    if (this.musicGain) this.musicGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.3);
+  }
+  toggleMusic() { if (this.musicOn) this.stopMusic(); else this.startMusic(); return this.musicOn; }
+
   // 网吧环境音：低频嗡嗡 + 随机键盘声 + 偶尔的QQ声
   startAmbience() {
     if (!this.ctx || this.ambOn) return;

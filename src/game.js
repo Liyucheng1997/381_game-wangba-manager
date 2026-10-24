@@ -3,17 +3,57 @@ import * as THREE from 'three';
 import { Character, randomLook, pick } from './people.js';
 import { Cafe, P } from './cafe.js';
 import { Screens } from './screens.js';
-import { CAST, DAYS, TARGET, finaleScript, endingInfo } from './story.js';
+import { CAST, DAYS, finaleScript, endingInfo } from './story.js';
 import { rng } from './textures.js';
 
 export const CFG = {
   secPerHour: 40, openHour: 9, closeHour: 24, lastEntry: 23,
   baseArrival: 4.6, startMoney: 1000,
   elec: 0.3, netCost: 40, netCostFiber: 55,
-  price: { noodle: 4, drink: 3 }, cost: { noodle: 1.5, drink: 1.2, headset: 12 },
-  needRates: { noodle: 0.05, drink: 0.06, headset: 0.014, crash: 0.022, quarrel: 0.004 },
-  patience: { checkin: 1.0, noodle: 1.2, drink: 1.1, headset: 1.0, crash: 1.1, virus: 1.5, smoke: 1.3, quarrel: 0.9, extend: 0.45, broken: 99, talk: 99, thief: 99 },
+  price: { noodle: 4, drink: 3, noodleplus: 6, card: 30 }, cost: { noodle: 1.5, drink: 1.2, headset: 12 },
+  needRates: { noodle: 0.05, drink: 0.06, headset: 0.014, crash: 0.022, quarrel: 0.004, card: 0.016 },
+  patience: { checkin: 1.0, noodle: 1.2, noodleplus: 1.3, drink: 1.1, headset: 1.0, card: 1.3, blanket: 1.8, crash: 1.1, virus: 1.5, smoke: 1.3, quarrel: 0.9, extend: 0.45, broken: 99, talk: 99, thief: 99 },
 };
+
+// 难度：控制时间流速、客人耐心、房租目标
+export const DIFF = {
+  casual: { label: '休闲', icon: '☕', desc: '节奏舒缓，客人很有耐心。适合慢慢体验剧情。', sec: 75, pat: 1.6, target: 5000, arrival: 0.85 },
+  normal: { label: '标准', icon: '🎮', desc: '正常节奏，需要合理规划路线。', sec: 55, pat: 1.25, target: 6000, arrival: 1 },
+  hard: { label: '挑战', icon: '🔥', desc: '快节奏，客人急躁，房租更高。', sec: 40, pat: 1.0, target: 8000, arrival: 1.1 },
+};
+
+// 网管技能
+export const SKILLS = {
+  speed: { name: '飞毛腿', icon: '👟', max: 3, desc: '走路速度 +15% / 级' },
+  hands: { name: '手脚麻利', icon: '🤲', max: 2, desc: '拿货、泡面、打扫、拖地等动作快 20% / 级' },
+  repair: { name: '巧手', icon: '🔧', max: 2, desc: '修电脑时每级排除 1 个错误选项，拍机箱更灵' },
+  talk: { name: '好口才', icon: '🗣', max: 3, desc: '客人耐心 +10% / 级，劝烟、调解更容易成功' },
+};
+// 升级经验：第 L 级需要累计 40·(L-1)² 点经验
+export const levelOf = (xp) => 1 + Math.floor(Math.sqrt((xp || 0) / 40));
+export const levelRange = (L) => [40 * (L - 1) * (L - 1), 40 * L * L];
+
+// 成就（跨存档永久保存）
+export const ACHIEVEMENTS = [
+  { id: 'noodle1', icon: '🍜', name: '第一桶泡面', desc: '送出第一桶泡面', test: (s) => s.noodle >= 1 },
+  { id: 'noodle50', icon: '🥢', name: '泡面大师', desc: '累计送出 50 桶泡面', test: (s) => s.noodle >= 50 },
+  { id: 'sausage', icon: '🌭', name: '加个肠！', desc: '送出 15 份泡面加肠', test: (s) => s.sausage >= 15 },
+  { id: 'repair20', icon: '🔧', name: '修机小能手', desc: '修好 20 台电脑', test: (s) => s.repair >= 20 },
+  { id: 'slap', icon: '👋', name: '玄学大师', desc: '靠拍机箱修好 3 台电脑', test: (s) => s.slap >= 3 },
+  { id: 'refuse', icon: '🔞', name: '火眼金睛', desc: '拦下 10 个未成年人', test: (s) => s.refuse >= 10 },
+  { id: 'mop', icon: '🧽', name: '洁癖网管', desc: '拖地 10 次', test: (s) => s.mop >= 10 },
+  { id: 'thief', icon: '🚨', name: '抓贼英雄', desc: '亲手拦住偷鼠标的小偷', test: (s) => s.thief >= 1 },
+  { id: 'card', icon: '💳', name: '点卡贩子', desc: '卖出 20 张游戏点卡', test: (s) => s.card >= 20 },
+  { id: 'blanket', icon: '🛌', name: '暖心网管', desc: '给睡着的客人盖 10 次毛毯', test: (s) => s.blanket >= 10 },
+  { id: 'couple', icon: '💕', name: '月老', desc: '给情侣安排相邻座位 5 次', test: (s) => s.couple >= 5 },
+  { id: 'perfect', icon: '⭐', name: '零差评', desc: '一天接待 30 人以上且没有任何需求超时', test: (s) => s.perfect >= 1 },
+  { id: 'rich', icon: '💰', name: '日进斗金', desc: '单日净收入超过 1000 元', test: (s) => s.bestDay >= 1000 },
+  { id: 'full', icon: '🖥', name: '座无虚席', desc: '同时在线人数达到 30', test: (s) => s.peak >= 30 },
+  { id: 'rep100', icon: '🏅', name: '口碑爆棚', desc: '口碑达到 100', test: (s) => s.rep100 >= 1 },
+  { id: 'level5', icon: '🎓', name: '资深网管', desc: '网管等级达到 5 级', test: (s) => s.level >= 5 },
+  { id: 'kept', icon: '🏠', name: '守住了', desc: '按时交上房租', test: (s) => s.kept >= 1 },
+  { id: 'legend', icon: '👑', name: '网吧传奇', desc: '达成“网吧传奇”结局', test: (s) => s.legend >= 1 },
+];
 
 export const NEED_INFO = {
   checkin: { icon: '🪪', text: '等待开卡' },
@@ -25,6 +65,9 @@ export const NEED_INFO = {
   smoke: { icon: '🚬', text: '在抽烟' },
   quarrel: { icon: '💢', text: '在吵架' },
   extend: { icon: '⏰', text: '想续费' },
+  noodleplus: { icon: '🌭', text: '要泡面加根火腿肠' },
+  card: { icon: '💳', text: '要买张游戏点卡' },
+  blanket: { icon: '🛌', text: '睡着了，有点冷' },
   lag: { icon: '📶', text: '网卡了' },
   talk: { icon: '💬', text: '有话要说' },
   thief: { icon: '🕵️', text: '偷了鼠标！' },
@@ -35,8 +78,31 @@ const NICKS = ['阿强', '小军', '二狗', '大鹏', '阿杰', '小飞', '老�
 const NICKS_F = ['小丽', '阿娟', '婷婷', '小燕', '晶晶', '阿芳', '小雪', '倩倩'];
 
 const R = Math.random;
+export const TAG_INFO = { rich: { icon: '💰', name: '土豪' }, farmer: { icon: '⚔', name: '代练' }, couple: { icon: '💕', name: '情侣' }, member: { icon: '💳', name: '会员' } };
 const castLook = (key) => ({ ...randomLook(R), glasses: false, cap: false, backpack: false, ...CAST[key].look });
 const clamp = THREE.MathUtils.clamp;
+
+// 物品 → 库存键
+const ITEM_STOCK = { noodle_dry: 'noodle', drink: 'drink', headset: 'headset', sausage: 'sausage', card: 'card', blanket: 'blanket' };
+const ITEM_NAME = { noodle_dry: '泡面', noodle: '泡好的面', drink: '饮料', headset: '耳机', sausage: '火腿肠', card: '点卡', blanket: '毛毯' };
+// 需求 → 需要送达的物品
+const ITEM_NEEDS = { noodle: ['noodle'], noodleplus: ['noodle', 'sausage'], drink: ['drink'], headset: ['headset'], card: ['card'], blanket: ['blanket'] };
+
+function makePuddleMaterial() {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d');
+  for (let i = 0; i < 6; i++) {
+    const cx = 40 + Math.random() * 48, cy = 40 + Math.random() * 48, r = 18 + Math.random() * 22;
+    const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(0.75, 'rgba(255,255,255,0.8)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.beginPath(); x.ellipse(cx, cy, r, r * 0.75, Math.random() * 3, 0, 7); x.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  return new THREE.MeshStandardMaterial({ color: 0x9cc4ec, map: tex, transparent: true, opacity: 0.7, roughness: 0.04, metalness: 0.5, depthWrite: false });
+}
+const puddleGeo = new THREE.PlaneGeometry(1, 1);
+function loadAch() { try { return JSON.parse(localStorage.getItem('netcafe_ach') || '{}'); } catch (e) { return {}; } }
+function saveAch(a) { try { localStorage.setItem('netcafe_ach', JSON.stringify(a)); } catch (e) { /* 忽略 */ } }
 
 function hourCurve(h) {
   const pts = [[9, 0.45], [11, 0.6], [12, 0.95], [14, 0.75], [16, 1.15], [17.5, 1.35], [19, 1.4], [20.5, 1.6], [22, 1.25], [23, 0.8], [24, 0.3]];
@@ -129,8 +195,12 @@ class Customer extends Agent {
   constructor(game, opts = {}) {
     const r = R;
     const minor = !!opts.minor;
-    const look = opts.look || randomLook(r, { minor });
+    let tag = opts.tag || null;
+    if (!tag && !minor && !opts.named && !opts.visitor) { const t = r(); if (t < 0.07) tag = 'rich'; else if (t < 0.15) tag = 'farmer'; }
+    const lookOv = tag === 'rich' ? { top: 'leather', topColor: 0x1a1a1a, topColor2: 0x1a1a1a, build: 1.2 } : tag === 'farmer' ? { glasses: true, hair: 'messy', top: 'hoodie' } : undefined;
+    const look = opts.look || randomLook(r, { minor, gender: opts.gender, look: lookOv });
     super(game, look);
+    this.tag = tag;
     this.minor = minor;
     this.age = opts.age || (minor ? 13 + Math.floor(r() * 4) : 18 + Math.floor(r() * 22));
     this.looksYoung = minor || (this.age <= 19 && r() < 0.5) || look.top === 'uniform';
@@ -142,13 +212,16 @@ class Customer extends Agent {
     this.sat = 72 + (r() - 0.5) * 16;
     this.smoker = !minor && !this.named && look.gender === 'm' && r() < 0.14;
     this.thief = false;
-    this.rich = !minor && r() < 0.2;
+    this.rich = tag === 'rich' || (!minor && r() < 0.1);
+    if (tag === 'rich') { this.hours = 3 + Math.floor(r() * 4); if (!opts.name) this.name = SURNAMES[Math.floor(r() * SURNAMES.length)] + '老板'; }
+    if (tag === 'farmer') this.hours = 7 + Math.floor(r() * 4);
+    this.blanket = false; this.member = false;
     this.need = null;
     this.seat = null;
     this.state = 'arrive';
     this.speed = 1.2 + r() * 0.35;
     const progs = look.gender === 'f' ? ['qq', 'qq', 'dance', 'dance', 'movie'] : ['cs', 'cs', 'cs', 'legend', 'legend', 'war', 'qq', 'movie'];
-    const pname = opts.program ? opts.program.replace(/\d+$/, '') : pick(r, progs);
+    const pname = opts.program ? opts.program.replace(/\d+$/, '') : (tag === 'farmer' ? 'legend' : pick(r, progs));
     const vars = game.screens.variants(pname);
     this.program = opts.program || pick(r, vars.length ? vars : ['login']);
     this.extendAsked = false;
@@ -159,7 +232,8 @@ class Customer extends Agent {
   get seated() { return this.state === 'playing' && !!this.seatedOn; }
 
   setNeed(type, patience, data) {
-    const p = patience ?? CFG.patience[type] ?? 1;
+    let p = patience ?? CFG.patience[type] ?? 1;
+    if (p < 50) p *= this.game.patMul();
     this.need = { type, t: p, max: p, data: data || null };
     if (type !== 'checkin' && type !== 'talk' && type !== 'extend') this.game.audio.play('need');
     this.game.onNeedCreated(this, type);
@@ -193,6 +267,12 @@ class Customer extends Agent {
       if (this.need.type === 'checkin' || this.state === 'queue') this.sat -= gdt * 10;
       if (this.need.t <= 0) g.needTimeout(this);
     }
+    if (this.slipT > 0) {
+      this.slipT -= dt;
+      this.char.anim = 'rage';
+      this.sync();
+      return;
+    }
     const moving = this.move(dt);
     switch (this.state) {
       case 'queue': {
@@ -217,6 +297,11 @@ class Customer extends Agent {
         g.dayStats.pcHours += gdt;
         // 满意度漂移
         this.sat += gdt * g.comfortRate(this);
+        // 深夜犯困，需要毛毯
+        if (!this.need && !this.blanket && !this.named && g.hour > 21 && this.remaining > 1.2 && R() < gdt * (this.tag === 'farmer' ? 0.35 : 0.07) * (g.state.up.ac ? 0.6 : 1.4)) {
+          this.sleepy = true; this.setNeed('blanket');
+        }
+        if (this.napT > 0) { this.napT -= gdt; if (this.napT <= 0) this.sleepy = false; }
         // 随机需求
         if (!this.need && !this.pendingNeed && !this.named) this.rollNeeds(gdt);
         if (!this.need && this.named && this.opts.randomNeeds !== false && R() < gdt * 0.08) this.rollNeeds(gdt * 0.5);
@@ -249,7 +334,7 @@ class Customer extends Agent {
       else if (this.eatT > 0) { this.eatT -= gdt; c.anim = this.eatKind === 'noodle' ? 'eat' : 'drink'; if (this.eatT <= 0) c.setProp(null); }
       else if (this.cheerT > 0) { this.cheerT -= dt; c.anim = 'cheerSit'; }
       else if (n === 'talk' || n === 'extend') c.anim = 'sitTalk';
-      else if (this.sleepy) c.anim = 'sleep';
+      else if (this.sleepy || n === 'blanket') c.anim = 'sleep';
       else c.anim = 'type';
     } else if (this.state === 'visit' && this.need) c.anim = 'talk';
     else if (this.rageT > 0) { this.rageT -= dt; c.anim = 'rage'; }
@@ -262,8 +347,10 @@ class Customer extends Agent {
     const g = this.game, rt = CFG.needRates;
     const meal = (g.hour > 11.5 && g.hour < 13.5) || (g.hour > 17.5 && g.hour < 19.5) ? 2.2 : 1;
     if (this.smoker && !this.hadSmoke && R() < gdt * 0.35) { this.hadSmoke = true; this.forceNeed('smoke'); return; }
-    if (R() < gdt * rt.noodle * meal) return this.setNeed('noodle');
+    const farmer = this.tag === 'farmer' ? 2.5 : 1;
+    if (R() < gdt * rt.noodle * meal * farmer) return this.setNeed(R() < 0.35 ? 'noodleplus' : 'noodle');
     if (R() < gdt * rt.drink) return this.setNeed('drink');
+    if (R() < gdt * rt.card * (/legend|war/.test(this.program) ? 2 : 1) * (this.tag === 'rich' ? 2 : 1)) return this.setNeed('card');
     if (R() < gdt * rt.headset) return this.setNeed('headset');
     if (R() < gdt * rt.crash * g.crashMul()) return this.forceNeed('crash');
     if (R() < gdt * rt.quarrel) g.startQuarrel(this);
@@ -278,7 +365,7 @@ class Player extends Agent {
     this.hand = [];
     this.action = null;
   }
-  get cap() { return this.game.state.up.tray ? 3 : 1; }
+  get cap() { return this.game.state.up.tray ? 4 : 2; }
   update(dt) {
     if (this.action) {
       this.action.t += dt;
@@ -293,12 +380,13 @@ class Player extends Agent {
       this.keyWalking = false;
       this.char.anim = moving ? (this.hand.length ? 'carry' : 'walk') : 'idle';
     }
-    this.char.setProp(this.hand.length ? (this.hand.length > 1 ? 'tray' : this.hand[0]) : null);
+    if (this.action && this.action.prop) this.char.setHand([this.action.prop], false);
+    else this.char.setHand(this.hand, !!this.game.state.up.tray);
     this.sync();
   }
-  doAction(dur, anim, done, face) {
+  doAction(dur, anim, done, face, prop) {
     this.path = null;
-    this.action = { t: 0, dur, anim, done, face };
+    this.action = { t: 0, dur: dur * this.game.actMul(), anim, done, face, prop };
   }
 }
 
@@ -400,20 +488,69 @@ export class Game {
     this.marker = new THREE.Mesh(new THREE.RingGeometry(0.18, 0.26, 32), new THREE.MeshBasicMaterial({ color: 0x66ccff, transparent: true, opacity: 0, depthWrite: false }));
     this.marker.rotation.x = -Math.PI / 2; this.marker.position.y = 0.02;
     this.scene.add(this.marker);
+    // 悬停高亮圈
+    this.hoverRing = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.52, 40), new THREE.MeshBasicMaterial({ color: 0xffd84a, transparent: true, opacity: 0.8, depthWrite: false }));
+    this.hoverRing.rotation.x = -Math.PI / 2; this.hoverRing.position.y = 0.03; this.hoverRing.visible = false;
+    this.scene.add(this.hoverRing);
+    this.puddles = [];
+    this.puddleMat = makePuddleMaterial();
+    this.ach = loadAch();
     this.newState();
     this.cafe.rebuildFurniture(this.state);
     this.cafe.setDaylight(13);
     this.firstSeen = {};
+    this.achAcc = 0;
   }
 
-  newState() {
+  // ---------- 难度 / 技能 ----------
+  get diffCfg() { return DIFF[this.state.diff] || DIFF.normal; }
+  get target() { return this.diffCfg.target; }
+  get secPerHour() { return this.diffCfg.sec; }
+  skill(k) { return (this.state.skills && this.state.skills[k]) || 0; }
+  patMul() { return this.diffCfg.pat * (1 + 0.1 * this.skill('talk')); }
+  actMul() { return 1 - 0.2 * this.skill('hands'); }
+  get level() { return levelOf(this.state.xp); }
+  levelProgress() { const [a, b] = levelRange(this.level); return [(this.state.xp || 0) - a, b - a]; }
+  get freeSP() { const spent = Object.values(this.state.skills || {}).reduce((a, b) => a + b, 0); return this.level - 1 - spent; }
+  gainXP(n) {
+    const before = this.level;
+    this.state.xp = (this.state.xp || 0) + n;
+    if (this.level > before) {
+      this.stat('level', this.level, true);
+      this.toast(`🎉 网管升到 Lv.${this.level}！夜间经营时可以学习新技能`, 'ok');
+      this.audio.play('ok');
+    }
+  }
+  stat(k, v = 1, set = false) {
+    const s = this.state.stats || (this.state.stats = {});
+    s[k] = set ? Math.max(s[k] || 0, v) : (s[k] || 0) + v;
+  }
+  checkAch() {
+    const s = this.state.stats || {};
+    for (const a of ACHIEVEMENTS) {
+      if (this.ach[a.id] || !a.test(s)) continue;
+      this.ach[a.id] = Date.now();
+      saveAch(this.ach);
+      this.toast(`🏆 成就解锁：${a.icon} ${a.name} —— ${a.desc}`, 'ach');
+      this.audio.play('ok');
+    }
+  }
+
+  newState(diff = 'casual') {
     const owned = this.cafe.seats.filter((s) => s.row === 'C' || s.row === 'D').map((s) => s.id);
     this.state = {
-      day: 1, money: CFG.startMoney, rep: 50, price: 3, vipPrice: 6,
-      owned, up: {}, stock: { noodle: 30, drink: 30, headset: 4 },
+      day: 1, money: CFG.startMoney, rep: 50, price: 3, vipPrice: 6, diff,
+      owned, up: {}, stock: { noodle: 30, drink: 30, headset: 4, sausage: 20, card: 8, blanket: 6 },
       flags: {}, aff: { laowang: 0, xiaomei: 0, boven: 0 },
       history: [], rival: false, crashMod: 1,
+      xp: 0, skills: { speed: 0, hands: 0, repair: 0, talk: 0 }, stats: {},
     };
+  }
+  fillDefaults() {
+    const d = { diff: 'normal', xp: 0, skills: { speed: 0, hands: 0, repair: 0, talk: 0 }, stats: {} };
+    for (const k in d) if (this.state[k] === undefined) this.state[k] = d[k];
+    const st = this.state.stock;
+    for (const [k, v] of Object.entries({ sausage: 20, card: 8, blanket: 6 })) if (st[k] === undefined) st[k] = v;
   }
   get flags() { return this.state.flags; }
 
@@ -424,7 +561,7 @@ export class Game {
   load() {
     try {
       const s = JSON.parse(localStorage.getItem('netcafe_save_v1'));
-      if (s && s.day) { this.state = s; return true; }
+      if (s && s.day) { this.state = s; this.fillDefaults(); return true; }
     } catch (e) { /* 忽略 */ }
     return false;
   }
@@ -444,6 +581,8 @@ export class Game {
     this.cafe.rivalGroup.visible = !!st.rival;
     this.player.stop(); this.player.action = null; this.player.hand = [];
     this.player.setPos(P.staff.x, P.staff.z); this.player.rot = Math.PI;
+    this.player.speed = 3.3 * (1 + 0.15 * this.skill('speed'));
+    for (const p of [...this.puddles]) this.removePuddle(p);
     if (st.up.cashier) { const c = new Staff(this, 'cashier'); c.setPos(P.staff2.x, P.staff2.z); this.staff.push(c); }
     if (st.up.cleaner) { const c = new Staff(this, 'cleaner'); c.setPos(3.2, 5.8); this.staff.push(c); }
     this.dayStats = { income: { net: 0, goods: 0, other: 0, night: 0 }, expense: [], customers: 0, lost: 0, served: 0, pcHours: 0, repStart: st.rep, timeouts: 0, moneyStart: st.money };
@@ -452,6 +591,7 @@ export class Game {
     this.events = (D.events || []).map((e) => ({ ...e, fired: false }));
     this.randomEvents = this.rollRandomEvents();
     this.netDownOn = false; this.blackoutOn = false; this.crashToday = 1;
+    this.snowy = /雪/.test(D.weather);
     this.closing = false;
     this.cafe.setDaylight(this.hour);
     this.phase = 'intro';
@@ -493,11 +633,17 @@ export class Game {
     if (st.up.cleaner) this.money(-30, 'exp', '保洁王阿姨工资');
     ds.net = Math.round(ds.income.net + ds.income.goods + ds.income.other + ds.income.night);
     this.dayStats.netTotal = ds.net;
+    this.stat('bestDay', st.money - ds.moneyStart, true);
+    if (ds.timeouts === 0 && ds.served >= 30) this.stat('perfect');
+    this.checkAch();
     await this.say(this.dayDef.outro || []);
     if (this.dayDef.finale) {
       await this.say(finaleScript(this));
       if (!this.flags.ending) this.flag('paidRent', true);
       const info = endingInfo(this);
+      if (this.flags.paidRent) this.stat('kept');
+      if (info.key === 'legend') this.stat('legend');
+      this.checkAch();
       st.history.push(this.reportData());
       this.ui.ending(info, this);
       try { localStorage.removeItem('netcafe_save_v1'); } catch (e) { /* */ }
@@ -525,8 +671,7 @@ export class Game {
   // ---------- 主循环 ----------
   update(rdt) {
     const dt = this.modal > 0 || this.phase !== 'play' ? 0 : rdt * this.speed;
-    const gdt = dt / CFG.secPerHour;
-    const anyDt = rdt * (this.speed > 1 ? Math.min(this.speed, 2) : 1);
+    const gdt = dt / this.secPerHour;
     if (this.phase === 'play' && dt > 0) {
       this.hour += gdt;
       this.cafe.setDaylight(this.hour);
@@ -538,6 +683,14 @@ export class Game {
         this.endDay();
       }
       if (this.blackoutOn && this.blackoutUntil && this.hour >= this.blackoutUntil) this.endBlackout();
+      this.updatePuddles(gdt);
+      this.achAcc += rdt;
+      if (this.achAcc > 1) {
+        this.achAcc = 0;
+        this.stat('peak', this.customers.filter((c) => c.seated).length, true);
+        if (this.state.rep >= 100) this.stat('rep100', 1, true);
+        this.checkAch();
+      }
     }
     // 角色
     for (const c of [...this.customers]) {
@@ -555,6 +708,7 @@ export class Game {
     this.smoke.update(dt);
     this.screens.update(rdt);
     this.cafe.update(rdt, { hour: this.hour, people: [...this.customers, this.player], netDown: this.netDownOn, neon: !!this.state.up.neon });
+    if (this.hoverRing.visible) { const k = 1 + Math.sin(performance.now() / 160) * 0.06; this.hoverRing.scale.set(k, k, k); }
     if (this.marker.material.opacity > 0) { this.marker.material.opacity -= rdt * 1.2; this.marker.scale.setScalar(1 + (1 - this.marker.material.opacity) * 0.6); }
     // 剧情队列
     if (this.modal === 0 && this.sayQueue.length && this.phase === 'play') this.say(this.sayQueue.shift());
@@ -592,9 +746,11 @@ export class Game {
     const neonF = st.up.neon ? 1.15 : 1;
     const evening = this.mod.eveningBoost && this.hour > 19 && this.hour < 22.5 ? this.mod.eveningBoost : 1;
     const plaque = this.flags.plaque ? 1.1 : 1;
-    const lambda = CFG.baseArrival * hourCurve(this.hour) * repF * priceF * rivalF * neonF * (this.mod.arrival || 1) * evening * plaque * (st.day === 1 ? 0.75 : 1);
+    const memberF = st.up.member ? 1.12 : 1;
+    const lambda = CFG.baseArrival * hourCurve(this.hour) * repF * priceF * rivalF * neonF * memberF * this.diffCfg.arrival * (this.mod.arrival || 1) * evening * plaque * (st.day === 1 ? 0.75 : 1);
     if (R() < lambda * gdt) {
       const minorChance = this.mod.minors ? (this.hour > 15.5 && this.hour < 21 ? 0.14 : 0.06) : 0;
+      if (st.day >= 2 && R() < 0.07) { this.spawnCouple(); return; }
       this.spawnCustomer({ minor: R() < minorChance });
       if (R() < 0.18) setTimeout(() => this.spawnCustomer({}), 700);
     }
@@ -610,6 +766,18 @@ export class Game {
     c.goTo(P.doorOut.x, P.doorOut.z, () => { c.state = 'queue'; c.queueSpot = -1; this.queue.push(c); this.audio.play('door'); });
     if (!opts.named) this.dayStats.customers++;
     return c;
+  }
+
+  // 情侣：一起来，想坐在一起
+  spawnCouple() {
+    const a = this.spawnCustomer({ tag: 'couple', gender: 'm' });
+    if (!a) return;
+    const b = this.spawnCustomer({ tag: 'couple', gender: 'f' });
+    if (!b) return;
+    b.setPos(a.x + 0.5, a.z + 0.3);
+    b.hours = b.remaining = a.hours;
+    a.partner = b; b.partner = a;
+    b.speed = a.speed;
   }
 
   spawnNamed(key, opts = {}) {
@@ -659,6 +827,8 @@ export class Game {
 
   customerLeave(c, forced = false) {
     const s = c.seat;
+    if (c.blanket) { c.blanket = false; c.char.setBlanket(false); this.state.stock.blanket++; }
+    c.sleepy = false;
     if (s) {
       if (R() < 0.6 && !c.named) this.cafe.setMess(s, true);
       s.customer = null;
@@ -688,6 +858,7 @@ export class Game {
   }
 
   despawn(c) {
+    if (c.blanket) { c.blanket = false; this.state.stock.blanket++; }
     const i = this.customers.indexOf(c);
     if (i >= 0) this.customers.splice(i, 1);
     const qi = this.queue.indexOf(c);
@@ -712,8 +883,8 @@ export class Game {
     return pick(R, vip);
   }
 
-  assignSeat(c) {
-    const seat = this.pickSeat(c);
+  assignSeat(c, forced) {
+    const seat = forced || this.pickSeat(c);
     const qi = this.queue.indexOf(c);
     if (qi >= 0) this.queue.splice(qi, 1);
     if (c.need && c.need.type === 'checkin') c.need = null;
@@ -734,6 +905,14 @@ export class Game {
     }
     this.audio.play('cash');
     this.dayStats.served++;
+    this.gainXP(1);
+    // 会员卡充值
+    if (this.state.up.member && c.opts.paid !== false && !c.named && !c.minor && !c.member && R() < 0.09) {
+      c.member = true; c.sat += 5;
+      const amt = R() < 0.65 ? 30 : 50;
+      this.money(amt, 'other', '会员充值', { x: P.staff.x + 0.6, z: P.staff.z + 0.8 });
+      this.toast(`💳 ${c.name}办了张会员卡，充值 ¥${amt}`, 'ok');
+    }
     c.goTo(seat.approach.x, seat.approach.z, () => {
       c.sitAt(seat);
       c.state = 'playing';
@@ -743,11 +922,33 @@ export class Game {
     return true;
   }
 
+  // 情侣入座：尽量安排相邻座位
+  assignCouple(a) {
+    const b = a.partner;
+    const free = this.cafe.seats.filter((s) => s.owned && !s.customer && !s.broken && !s.virus && !s.reserved && s.type !== 'vip');
+    let pair = null;
+    for (const s of free) {
+      const n = free.find((o) => o !== s && o.row === s.row && Math.abs(o.z - s.z) < 0.1 && Math.abs(Math.abs(o.x - s.x) - 1.2) < 0.15);
+      if (n) { pair = [s, n]; break; }
+    }
+    if (pair) {
+      this.assignSeat(a, pair[0]); this.assignSeat(b, pair[1]);
+      a.sat += 10; b.sat += 10; a.cheerT = b.cheerT = 2;
+      this.stat('couple');
+      this.toast(`💕 给${a.name}和${b.name}安排了相邻的座位`, 'ok');
+    } else {
+      this.assignSeat(a); if (b.state !== 'leaving') this.assignSeat(b);
+      a.sat -= 8; b.sat -= 8;
+      this.toast('没有相邻的空位，小两口只好分开坐，有点不高兴', 'warn');
+    }
+  }
+
   // 玩家开卡
   async doCheckin(c) {
     if (this.checkinBusy) return;
     this.checkinBusy = true;
     try {
+      if (c.partner && this.queue.includes(c.partner)) { this.assignCouple(c); return; }
       if (c.opts.onCheckin) {
         this.forceSeat = false; this.cancelled = false; this.currentCheckin = c;
         const special = c.opts.special;
@@ -789,7 +990,7 @@ export class Game {
     ] });
     await this.say(lines);
     if (result === 'refuse') {
-      if (c.minor) this.rep(0.5);
+      if (c.minor) { this.rep(0.5); this.stat('refuse'); }
       this.toast(`${c.name}被劝走了`);
       this.sendOut(c);
     }
@@ -798,7 +999,8 @@ export class Game {
 
   cashierCheckin(c) {
     if (c.named) return;
-    if (c.minor) { this.toast('阿芳查了身份证，劝走了一个未成年人'); this.sendOut(c); return; }
+    if (c.minor) { this.toast('阿芳查了身份证，劝走了一个未成年人'); this.stat('refuse'); this.sendOut(c); return; }
+    if (c.partner && this.queue.includes(c.partner)) { this.assignCouple(c); return; }
     this.assignSeat(c);
   }
 
@@ -809,7 +1011,7 @@ export class Game {
 
   // ---------- 需求处理 ----------
   onNeedCreated(c, type) {
-    if (!this.firstSeen[type] && this.state.day <= 2) {
+    if (!this.firstSeen[type]) {
       this.firstSeen[type] = true;
       const tips = {
         noodle: '有客人要泡面🍜：货架拿泡面 → 饮水机接热水 → 送到座位。',
@@ -818,6 +1020,9 @@ export class Game {
         crash: '有电脑出故障了💻：走过去点一下进行维修。',
         smoke: '有人抽烟🚬：过去劝阻一下，烟味会让周围客人不满。',
         extend: '有客人想续费⏰：过去点一下就能多收钱！',
+        noodleplus: '有客人要泡面加肠🌭：货架拿泡面和火腿肠 → 泡面加热水 → 一起送过去。',
+        card: '有客人要买游戏点卡💳：去收银台的点卡盒拿一张。',
+        blanket: '有客人睡着了🛌：去杂物架拿条毛毯给他盖上。走的时候毛毯会还回来。',
       };
       if (tips[type]) this.hint(tips[type]);
     }
@@ -837,6 +1042,7 @@ export class Game {
     }
     if (t === 'smoke') { c.char.setProp(null); this.neighbors(c).forEach((o) => { o.sat -= 6; }); return; }
     if (t === 'extend') return;
+    if (t === 'blanket') { c.sat -= 10; c.sleepy = false; return; }
     c.sat -= 25;
     this.rep(-1);
     if (t === 'crash' || t === 'virus') {
@@ -861,6 +1067,12 @@ export class Game {
     c.clearNeed(true);
     c.sat += extraSat;
     c.served++;
+    this.gainXP(3);
+    if (c.tag === 'rich' && R() < 0.4 && type && type !== 'talk') {
+      const tip = 5 + Math.floor(R() * 2) * 5;
+      this.money(tip, 'other', '土豪打赏', { x: c.x + 0.4, z: c.z });
+      if (R() < 0.4) this.toast(`${c.name}：“小伙子不错，拿去买烟！”（打赏 ¥${tip}）`, 'ok');
+    }
     if (c.opts.onServe) c.opts.onServe(this, type);
     return type;
   }
@@ -902,6 +1114,8 @@ export class Game {
       const n = c.need ? NEED_INFO[c.need.type] : null;
       let t = c.name;
       if (c.named) t = `${CAST[c.named].name}`;
+      if (c.tag && TAG_INFO[c.tag]) t += `【${TAG_INFO[c.tag].name}】`;
+      if (c.member) t += '【会员】';
       if (n) t += ` · ${n.icon} ${n.text}`;
       else if (c.state === 'playing') t += ` · 剩余 ${c.remaining.toFixed(1)} 小时 · 满意度 ${Math.round(c.sat)}`;
       else if (c.state === 'queue') t += ' · 排队中';
@@ -914,8 +1128,10 @@ export class Game {
     }
     if (hit.interact) {
       const st = this.state.stock;
+      if (hit.interact === 'puddle') return '💧 地上的水渍 · 点击拖干净（客人可能会滑倒）';
       return {
-        fridge: `冰柜 · 拿饮料（库存 ${st.drink}）`, shelf: `货架 · 拿泡面（库存 ${st.noodle}）`, headset: `耳机架 · 拿耳机（库存 ${st.headset}）`,
+        cards: `点卡盒 · 拿游戏点卡（库存 ${st.card}）`,
+        fridge: `冰柜 · 拿饮料（库存 ${st.drink}）`, shelf: `货架 · 泡面 ${st.noodle} / 火腿肠 ${st.sausage}`, headset: `杂物架 · 耳机 ${st.headset} / 毛毯 ${st.blanket}`,
         dispenser: '饮水机 · 给泡面加热水', trash: '垃圾桶 · 扔掉手上的东西', router: this.netDownOn ? '路由器 · 网络故障！点击重启' : '路由器 · 运行正常', counter: '收银台 · 去前台开卡',
       }[hit.interact];
     }
@@ -927,12 +1143,37 @@ export class Game {
     if (this.player.action) return;
     const pl = this.player;
     if (hit && hit.customer) return this.clickCustomer(hit.customer);
+    if (hit && hit.puddle) return this.clickPuddle(hit.puddle);
     if (hit && hit.seat) return this.clickSeat(hit.seat);
     if (hit && hit.interact) return this.clickInteract(hit.interact);
     if (point) {
       pl.goTo(point.x, point.z);
       this.showMarker(point.x, point.z);
     }
+  }
+
+  setHover(hit) {
+    const r = this.hoverRing;
+    let p = null;
+    if (hit && hit.customer) p = { x: hit.customer.x, z: hit.customer.z };
+    else if (hit && hit.puddle) p = { x: hit.puddle.x, z: hit.puddle.z };
+    else if (hit && hit.seat) p = { x: (hit.seat.x + hit.seat.desk.x) / 2, z: (hit.seat.z + hit.seat.desk.z) / 2 };
+    else if (hit && hit.interact && this.cafe.hotspots[hit.interact]) p = this.cafe.hotspots[hit.interact];
+    r.visible = !!p && this.phase === 'play';
+    if (p) r.position.set(p.x, 0.03, p.z);
+  }
+
+  // 小地图点击
+  minimapClick(x, z) {
+    if (this.phase !== 'play' || this.modal > 0 || this.player.action) return;
+    const pd = this.puddles.find((p) => Math.hypot(p.x - x, p.z - z) < 0.7);
+    if (pd) return this.clickPuddle(pd);
+    const seat = this.cafe.seats.find((s) => s.owned && Math.hypot((s.x + s.desk.x) / 2 - x, (s.z + s.desk.z) / 2 - z) < 0.65);
+    if (seat) return this.clickSeat(seat);
+    for (const [k, h] of Object.entries(this.cafe.hotspots)) if (Math.hypot(h.x - x, h.z - z) < 0.6) return this.clickInteract(k);
+    if (this.queue.some((c) => Math.hypot(c.x - x, c.z - z) < 0.7)) return this.goCheckinFront();
+    const [i, j] = this.cafe.nav.nearestFree(this.cafe.nav.ix(x), this.cafe.nav.iz(z));
+    this.walkThen({ x: this.cafe.nav.cx(i), z: this.cafe.nav.cz(j) });
   }
 
   showMarker(x, z) { this.marker.position.set(x, 0.02, z); this.marker.material.opacity = 0.9; this.marker.scale.setScalar(1); }
@@ -947,6 +1188,7 @@ export class Game {
       return this.walkThen({ x: c.x, z: c.z }, () => {
         if (c.need && c.need.type === 'thief' && Math.hypot(c.x - this.player.x, c.z - this.player.z) < 1.6) {
           c.need = null; c.stop();
+          this.stat('thief'); this.gainXP(5);
           this.say([['me', '站住！兜里是啥？'], ['sys', '对方脸一红，乖乖交出了鼠标，灰溜溜地走了。'], { do: (g) => { g.rep(2); g.sendOut(c); } }]);
         } else if (c.need && c.need.type === 'thief') this.clickCustomer(c);
       });
@@ -978,21 +1220,29 @@ export class Game {
     const pl = this.player;
     if (c && c.need) {
       const t = c.need.type;
-      if (['noodle', 'drink', 'headset'].includes(t)) {
-        const want = t === 'noodle' ? 'noodle' : t;
-        if (!pl.hand.includes(want)) {
-          if (t === 'noodle' && pl.hand.includes('noodle_dry')) return this.toast('泡面还没加热水呢！先去饮水机。', 'warn');
-          return this.toast({ noodle: '先去货架拿泡面，再到饮水机加热水', drink: '先去冰柜拿饮料', headset: '先去耳机架拿耳机' }[t], 'warn');
+      if (ITEM_NEEDS[t]) {
+        const want = ITEM_NEEDS[t];
+        const missing = want.filter((w) => !pl.hand.includes(w));
+        if (missing.length) {
+          if (missing.includes('noodle') && pl.hand.includes('noodle_dry')) return this.toast('泡面还没加热水呢！先去饮水机。', 'warn');
+          const where = { noodle: '货架拿泡面→饮水机加热水', sausage: '货架拿火腿肠', drink: '冰柜拿饮料', headset: '杂物架拿耳机', card: '收银台点卡盒拿点卡', blanket: '杂物架拿毛毯' };
+          return this.toast('还缺：' + missing.map((m) => where[m]).join('；'), 'warn');
         }
         return this.walkThen(s.service, () => {
           if (!c.need || c.need.type !== t) return;
           pl.doAction(0.5, 'work', () => {
-            pl.hand.splice(pl.hand.indexOf(want), 1);
+            for (const w of want) pl.hand.splice(pl.hand.indexOf(w), 1);
             this.resolveNeed(c, 10);
             if (t === 'headset') { this.audio.play('ok'); this.toast('换好耳机了'); }
-            else {
-              this.money(CFG.price[t], 'goods', t === 'noodle' ? '泡面' : '饮料', { x: s.x, z: s.z });
-              c.eatT = 0.6; c.eatKind = t; c.char.setProp(t);
+            else if (t === 'blanket') {
+              c.blanket = true; c.char.setBlanket(true); c.sleepy = true; c.napT = 1.0;
+              this.stat('blanket'); this.audio.play('ok');
+            } else {
+              this.money(CFG.price[t], 'goods', { noodle: '泡面', noodleplus: '泡面加肠', drink: '饮料', card: '游戏点卡' }[t], { x: s.x, z: s.z });
+              if (t === 'noodle' || t === 'noodleplus') { this.stat('noodle'); if (t === 'noodleplus') this.stat('sausage'); }
+              if (t === 'card') this.stat('card');
+              if (t !== 'card') { c.eatT = 0.6; c.eatKind = t === 'drink' ? 'drink' : 'noodle'; c.char.setProp(t === 'drink' ? 'drink' : 'noodle'); }
+              if (t === 'drink' && R() < 0.07) this.later(0.3 + R() * 0.6, () => this.spawnPuddle(s.service.x + (R() - 0.5) * 0.4, s.service.z + (R() - 0.5) * 0.3, true));
               this.audio.play('cash');
             }
           }, s.desk);
@@ -1008,8 +1258,9 @@ export class Game {
         return this.walkThen(s.service, async () => {
           pl.faceTo(s.desk.x, s.desk.z);
           if (!c.need || c.need.type !== 'smoke') return;
-          const ok = R() < 0.7;
+          const ok = R() < 0.7 + 0.08 * this.skill('talk');
           c.clearNeed(true);
+          this.gainXP(2);
           c.sat -= ok ? 4 : 14;
           this.toast(ok ? `${c.name}：“好好好，掐了掐了。”` : `${c.name}：“抽根烟都管？什么破店！”（不满）`, ok ? 'ok' : 'warn');
         });
@@ -1058,6 +1309,7 @@ export class Game {
     } finally { this.modal--; }
     if (ok) {
       s.broken = false; s.virus = false;
+      this.stat('repair');
       if (c && c.need) this.resolveNeed(c, 6);
       this.cafe.applySeatScreen(s);
       this.audio.play('ok');
@@ -1080,7 +1332,7 @@ export class Game {
           else { g.toast('饮料不够了……', 'warn'); }
         } },
         { t: '“再吵就都出去！”', do: (g) => {
-          if (R() < 0.6) { both(); [c, other].forEach((x) => x && (x.sat -= 5)); g.toast('两人悻悻地坐下了'); }
+          if (R() < 0.6 + 0.1 * g.skill('talk')) { both(); [c, other].forEach((x) => x && (x.sat -= 5)); g.toast('两人悻悻地坐下了'); }
           else { both(); g.toast(`${c.name}：“走就走！”`, 'bad'); c.remaining = 0; g.customerLeave(c); g.rep(-1); }
         } },
         { t: '“我给你换个位置。”', do: (g) => {
@@ -1097,23 +1349,69 @@ export class Game {
     ]);
   }
 
+  // 当前所有需求还缺哪些物品（扣掉手上已有的）
+  neededItems() {
+    const need = {};
+    for (const c of this.customers) {
+      if (!c.need || !ITEM_NEEDS[c.need.type]) continue;
+      for (const w of ITEM_NEEDS[c.need.type]) { const k = w === 'noodle' ? 'noodle_dry' : w; need[k] = (need[k] || 0) + 1; }
+    }
+    for (const h of this.player.hand) { const k = h === 'noodle' ? 'noodle_dry' : h; if (need[k]) need[k]--; }
+    return need;
+  }
+
+  takeItem(item) {
+    const pl = this.player, st = this.state.stock, key = ITEM_STOCK[item];
+    if (pl.hand.length >= pl.cap) { this.toast(pl.cap > 2 ? '托盘装满了' : '两只手都占满了（点下方物品可以放回；夜间可买托盘）', 'warn'); return false; }
+    if (st[key] <= 0) { this.toast(`${ITEM_NAME[item]}没货了！夜间记得进货`, 'bad'); return false; }
+    st[key]--; pl.hand.push(item);
+    this.audio.play('pick');
+    return true;
+  }
+
+  // 放回 / 扔掉手上的某件东西
+  dropItem(i) {
+    const pl = this.player;
+    const item = pl.hand[i];
+    if (!item || pl.action) return;
+    pl.hand.splice(i, 1);
+    if (ITEM_STOCK[item]) { this.state.stock[ITEM_STOCK[item]]++; this.toast(`把${ITEM_NAME[item]}放回去了`); }
+    else this.toast('泡好的面只能倒掉了……', 'warn');
+    this.audio.play('click');
+  }
+
+  // 从货架/杂物架挑东西：只缺一样时直接拿，否则弹出选择
+  async pickFrom(title, items) {
+    const need = this.neededItems();
+    const wanted = items.filter((it) => need[it] > 0 && this.state.stock[ITEM_STOCK[it]] > 0);
+    if (wanted.length === 1 && items.length > 1) {
+      // 只缺一种东西：直接拿够数量
+      let n = Math.min(need[wanted[0]], this.player.cap - this.player.hand.length);
+      if (n <= 0) return this.takeItem(wanted[0]);
+      while (n-- > 0 && this.takeItem(wanted[0]));
+      return;
+    }
+    if (items.length === 1) return this.takeItem(items[0]);
+    this.modal++;
+    try {
+      await this.ui.picker(this, title, items.map((it) => ({ item: it, name: ITEM_NAME[it], stockKey: ITEM_STOCK[it], need: need[it] || 0 })));
+    } finally { this.modal--; }
+  }
+
   clickInteract(k) {
-    const pl = this.player, st = this.state.stock;
-    const take = (item, stockKey, label) => {
-      if (pl.hand.length >= pl.cap) return this.toast(pl.cap > 1 ? '托盘装满了' : '手里拿不下了（夜间可以买托盘）', 'warn');
-      if (st[stockKey] <= 0) return this.toast(`${label}卖完了！夜间记得进货`, 'bad');
-      st[stockKey]--; pl.hand.push(item);
-      this.audio.play('pick');
-    };
-    if (k === 'fridge') return this.walkThen(P.fridge, () => pl.doAction(0.35, 'work', () => take('drink', 'drink', '饮料'), { x: 9.6, z: 0.95 }));
-    if (k === 'shelf') return this.walkThen(P.shelf, () => pl.doAction(0.35, 'work', () => take('noodle_dry', 'noodle', '泡面'), { x: 6.4, z: 0.4 }));
-    if (k === 'headset') return this.walkThen(P.headset, () => pl.doAction(0.35, 'work', () => take('headset', 'headset', '耳机'), { x: 5.0, z: 0.3 }));
+    const pl = this.player;
+    const act = (pt, face, fn) => this.walkThen(pt, () => pl.doAction(0.35, 'work', fn, face));
+    if (k === 'fridge') return act(P.fridge, { x: 9.6, z: 0.95 }, () => this.takeItem('drink'));
+    if (k === 'cards') return act(P.cards, { x: 7.05, z: 2.6 }, () => this.takeItem('card'));
+    if (k === 'shelf') return act(P.shelf, { x: 6.4, z: 0.4 }, () => this.pickFrom('货架', ['noodle_dry', 'sausage']));
+    if (k === 'headset') return act(P.headset, { x: 5.0, z: 0.3 }, () => this.pickFrom('杂物架', ['headset', 'blanket']));
     if (k === 'dispenser') return this.walkThen(P.dispenser, () => {
       if (!pl.hand.includes('noodle_dry')) return this.toast('手上没有要泡的面', 'warn');
       this.audio.play('water');
       pl.doAction(1.0, 'work', () => { pl.hand = pl.hand.map((h) => (h === 'noodle_dry' ? 'noodle' : h)); this.toast('泡面加好热水了，趁热送过去！'); }, { x: 9.7, z: 1.95 });
     });
     if (k === 'trash') return this.walkThen(P.trash, () => { if (pl.hand.length) { pl.hand = []; this.toast('扔掉了手上的东西'); } });
+    if (k === 'puddle') return;
     if (k === 'router') return this.walkThen(P.router, () => {
       if (!this.netDownOn) return this.toast('路由器运行正常，灯一闪一闪的');
       pl.doAction(2.2, 'work', () => this.fixNet(), { x: 8.05, z: 2.5 });
@@ -1133,6 +1431,58 @@ export class Game {
     pl.rot = Math.atan2(dx, dz);
     pl.char.walkPhase += sp * 5.2;
     pl.keyWalking = true;
+  }
+
+  // ---------- 地上的水渍 ----------
+  spawnPuddle(x, z, spill) {
+    if (this.puddles.length >= 6 || !this.cafe.nav.free(x, z)) return;
+    if (this.puddles.some((p) => Math.hypot(p.x - x, p.z - z) < 0.8)) return;
+    const mesh = new THREE.Mesh(puddleGeo, this.puddleMat);
+    mesh.rotation.x = -Math.PI / 2; mesh.rotation.z = R() * 6;
+    mesh.position.set(x, 0.006, z);
+    mesh.scale.setScalar(0.7 + R() * 0.4);
+    mesh.renderOrder = -1;
+    this.scene.add(mesh);
+    const hit = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.15, 0.8), new THREE.MeshBasicMaterial({ visible: false }));
+    hit.position.set(x, 0.08, z);
+    this.scene.add(hit);
+    const p = { id: (this.puddleId = (this.puddleId || 0) + 1), x, z, mesh, hit, met: new Set() };
+    hit.userData.interact = 'puddle'; hit.userData.puddle = p;
+    this.cafe.pickables.push(hit);
+    this.puddles.push(p);
+    if (spill) this.toast('有人把饮料打翻了，地上一滩水💧', 'warn');
+  }
+  removePuddle(p) {
+    this.scene.remove(p.mesh); this.scene.remove(p.hit);
+    p.hit.geometry.dispose();
+    this.cafe.pickables = this.cafe.pickables.filter((o) => o !== p.hit);
+    this.puddles = this.puddles.filter((o) => o !== p);
+  }
+  updatePuddles(gdt) {
+    if (this.snowy && !this.closing && R() < gdt * 0.5) {
+      this.spawnPuddle(6.6 + R() * 1.3, 4.6 + R() * 1.6);
+      if (!this.firstSeen.puddle) { this.firstSeen.puddle = true; this.hint('下雪天客人鞋上带进来雪水💧，及时拖地，不然有人会滑倒！'); }
+    }
+    for (const p of this.puddles) {
+      for (const c of this.customers) {
+        if (!c.path || c.seatedOn || c.slipT > 0) continue;
+        if (Math.hypot(c.x - p.x, c.z - p.z) > 0.42 || p.met.has(c.id)) continue;
+        p.met.add(c.id);
+        if (R() < 0.18) {
+          c.slipT = 1.3; c.sat -= 12;
+          this.rep(-1.5);
+          this.audio.play('fail');
+          this.toast(`${c.name}踩到水渍滑了一跤：“哎哟！地上怎么这么多水！”`, 'bad');
+        }
+      }
+    }
+  }
+  clickPuddle(p) {
+    const pl = this.player;
+    this.walkThen({ x: p.x + 0.35, z: p.z + 0.2 }, () => {
+      if (!this.puddles.includes(p)) return;
+      pl.doAction(1.4, 'work', () => { this.removePuddle(p); this.stat('mop'); this.gainXP(2); this.audio.play('clean'); }, { x: p.x, z: p.z }, 'mop');
+    });
   }
 
   // ---------- 特殊事件 ----------
@@ -1312,9 +1662,9 @@ export class Game {
   sayLater(lines) { this.sayQueue.push(lines); }
 
   fmt(text) {
-    const gap = Math.max(0, TARGET - this.state.money);
+    const gap = Math.max(0, this.target - this.state.money);
     return text.replace('{net}', this.dayStats ? (this.dayStats.netTotal ?? Math.round(this.dayStats.income.net + this.dayStats.income.goods + this.dayStats.income.other)) : 0)
-      .replace('{left}', String(10 - this.state.day)).replace('{gap}', String(gap)).replace('{gapNow}', String(gap));
+      .replace('{left}', String(10 - this.state.day)).replace('{gap}', String(gap)).replace('{gapNow}', String(gap)).replace(/\{target\}/g, String(this.target));
   }
 
   async say(lines) {
@@ -1361,17 +1711,20 @@ export class Game {
       const label = c.named ? CAST[c.named].name : null;
       if (!icon && !label) continue;
       const h = c.seatedOn ? 1.55 : 2.05;
-      out.push({ id: c.id, pos: new THREE.Vector3(c.x, h * c.look.height, c.z), icon, ratio, cls, label });
+      const badge = c.tag && TAG_INFO[c.tag] ? TAG_INFO[c.tag].icon : (c.member ? TAG_INFO.member.icon : '');
+      out.push({ id: c.id, pos: new THREE.Vector3(c.x, h * c.look.height, c.z), icon, ratio, cls, label, badge, click: () => (this.phase === 'play' && this.modal === 0 && !this.player.action) && this.clickCustomer(c) });
     }
+    for (const p of this.puddles) out.push({ id: 'p' + p.id, pos: new THREE.Vector3(p.x, 0.6, p.z), icon: '💧', ratio: 1, cls: 'talk', label: null, badge: '', click: () => (this.phase === 'play' && this.modal === 0 && !this.player.action) && this.clickPuddle(p) });
     return out;
   }
 
   needsList() {
-    return this.customers.filter((c) => c.need && c.need.type !== 'talk' || (c.need && c.need.type === 'talk')).map((c) => ({
+    const list = this.customers.filter((c) => c.need).map((c) => ({
       c, type: c.need.type, info: NEED_INFO[c.need.type], ratio: c.need.max > 50 ? 1 : c.need.t / c.need.max,
       where: c.seat ? c.seat.label : (c.state === 'queue' ? '前台' : '门口'), name: c.named ? CAST[c.named].name : c.name,
+      click: () => this.clickCustomer(c),
     })).sort((a, b) => a.ratio - b.ratio);
+    for (const p of this.puddles) list.push({ type: 'puddle', info: { icon: '💧', text: '地上有水渍，快拖干净' }, ratio: 1, where: '地面', name: '', click: () => this.clickPuddle(p) });
+    return list;
   }
 }
-
-export { TARGET };

@@ -343,17 +343,26 @@ export class Character {
     }
   }
 
-  setProp(kind) {
-    if (this.propKind === kind) return;
-    if (this.prop) { this.prop.parent.remove(this.prop); this.prop = null; }
-    this.propKind = kind;
-    if (!kind) return;
+  // 道具模型（挂在手上 / 托盘上）
+  makeProp(kind) {
     const g = new THREE.Group();
     if (kind === 'noodle' || kind === 'noodle_dry') {
       add(g, cyl(0.06, 0.045, 0.1, 12), texMat('cupNoodle0', T.noodle(0)), 0, -0.02, 0.06);
-      if (kind === 'noodle') add(g, cyl(0.062, 0.062, 0.004, 12), mat('lid', { color: 0xf0f0f0 }), 0, 0.03, 0.06);
+      if (kind === 'noodle') {
+        add(g, cyl(0.062, 0.062, 0.004, 12), mat('lid', { color: 0xf0f0f0 }), 0, 0.03, 0.06);
+        add(g, cyl(0.003, 0.003, 0.16, 4), mat('fork', { color: 0xf5f0e0 }), 0.02, 0.07, 0.06, 0, 0, 0.3);
+      }
     } else if (kind === 'drink') {
       add(g, cyl(0.032, 0.032, 0.12, 12), texMat('can0', T.can(0)), 0, -0.02, 0.04);
+    } else if (kind === 'sausage') {
+      add(g, cyl(0.014, 0.014, 0.17, 8), mat('sausage', { color: 0xd8463a, roughness: 0.5 }), 0, -0.02, 0.04, 0, 0, Math.PI / 2);
+      add(g, sph(0.015, 6, 4), mat('sausageEnd', { color: 0xf0d040, roughness: 0.5 }), 0.088, -0.02, 0.04);
+    } else if (kind === 'card') {
+      add(g, box(0.085, 0.055, 0.004), mat('gameCard', { color: 0xe8b020, roughness: 0.3, metalness: 0.3 }), 0, -0.02, 0.04);
+      add(g, box(0.06, 0.012, 0.005), mat('gameCardStripe', { color: 0x8a1010 }), 0, -0.01, 0.042);
+    } else if (kind === 'blanket') {
+      add(g, rbox(0.26, 0.08, 0.18, 0.03), mat('blanket', { color: 0x8a2a3a, roughness: 0.95 }), 0, -0.02, 0.09);
+      add(g, box(0.262, 0.012, 0.182), mat('blanketStripe', { color: 0xe8d8a0, roughness: 0.95 }), 0, -0.0, 0.09);
     } else if (kind === 'headset') {
       add(g, new THREE.TorusGeometry(0.075, 0.008, 6, 16, Math.PI), mat('black', { color: 0x18191c }), 0, 0.0, 0.05);
       add(g, cyl(0.04, 0.04, 0.03, 12), mat('darkMetal', { color: 0x2b2c30 }), 0.075, -0.01, 0.05, 0, 0, Math.PI / 2);
@@ -361,14 +370,56 @@ export class Character {
     } else if (kind === 'cig') {
       add(g, cyl(0.004, 0.004, 0.07, 5), mat('white', { color: 0xf2f2ee }), 0, 0, 0.03, Math.PI / 2, 0, 0);
       add(g, cyl(0.0045, 0.0045, 0.006, 5), mat('ember', { color: 0xff5500, emissive: 0xff3300, emissiveIntensity: 3 }), 0, 0, 0.066, Math.PI / 2, 0, 0);
-    } else if (kind === 'tray') {
-      add(g, box(0.36, 0.015, 0.26), mat('trayM', { color: 0x8a5a2a, roughness: 0.5 }), 0, 0, 0.12);
+    } else if (kind === 'mop') {
+      add(g, cyl(0.012, 0.012, 1.2, 6), mat('mopStick', { color: 0x8a6a3a, roughness: 0.6 }), 0, -0.25, 0.05, 0.25, 0, 0);
+      add(g, cyl(0.09, 0.07, 0.1, 10), mat('mopHead', { color: 0xd8d8c8, roughness: 1 }), 0, -0.82, 0.2);
     } else if (kind === 'phone') {
       add(g, box(0.05, 0.1, 0.02), mat('nokia', { color: 0x334455, roughness: 0.4 }), 0, -0.02, 0.03);
     }
-    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-    this.armR.hand.add(g);
-    this.prop = g;
+    g.traverse((o) => { if (o.isMesh) o.castShadow = false; });
+    return g;
+  }
+
+  setProp(kind) { this.setHand(kind ? [kind] : [], false); }
+
+  // 手上拿的东西：右手一件、左手一件；有托盘时全部摆在托盘上
+  setHand(items, tray) {
+    const key = (tray && items.length > 1 ? 'T:' : '') + items.join(',');
+    if (this.handKey === key) return;
+    this.handKey = key;
+    this.propKind = items[0] || null;
+    for (const p of [this.prop, this.propL]) if (p) p.parent.remove(p);
+    this.prop = this.propL = null;
+    if (!items.length) return;
+    if (tray && items.length > 1) {
+      const g = new THREE.Group();
+      add(g, box(0.4, 0.015, 0.28), mat('trayM', { color: 0x8a5a2a, roughness: 0.5 }), 0, 0, 0.14);
+      items.slice(0, 4).forEach((k, i) => {
+        const it = this.makeProp(k);
+        it.position.set(-0.1 + (i % 2) * 0.2, 0.06, (i < 2 ? 0.07 : 0.2) - 0.05);
+        it.scale.setScalar(0.85);
+        g.add(it);
+      });
+      this.armR.hand.add(g);
+      this.prop = g;
+      return;
+    }
+    this.prop = this.makeProp(items[0]);
+    this.armR.hand.add(this.prop);
+    if (items[1]) { this.propL = this.makeProp(items[1]); this.armL.hand.add(this.propL); }
+  }
+
+  // 披在肩上的毛毯
+  setBlanket(on) {
+    if (!!this.blanketMesh === on) return;
+    if (!on) { this.blanketMesh.parent.remove(this.blanketMesh); this.blanketMesh = null; return; }
+    const g = new THREE.Group();
+    const m = mat('blanket', { color: 0x8a2a3a, roughness: 0.95 });
+    add(g, rbox(0.46, 0.42, 0.06, 0.03), m, 0, 0.27, -0.14);
+    add(g, rbox(0.5, 0.08, 0.26, 0.04), m, 0, 0.48, -0.03);
+    add(g, box(0.462, 0.03, 0.062), mat('blanketStripe', { color: 0xe8d8a0, roughness: 0.95 }), 0, 0.12, -0.14);
+    this.spine.add(g);
+    this.blanketMesh = g;
   }
 
   // 主更新：根据当前动作计算目标姿态并平滑插值

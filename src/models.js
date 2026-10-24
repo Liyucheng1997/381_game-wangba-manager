@@ -309,6 +309,9 @@ export function makeCounter() {
   // 收银钱箱
   add(g, rbox(0.38, 0.1, 0.36, 0.01), M.darkMetal(), 0.3, 0.825, -0.05);
   add(g, box(0.3, 0.012, 0.01), M.metal(), 0.3, 0.83, -0.235);
+  // 点卡盒（传奇、魔兽、QQ币）
+  add(g, rbox(0.24, 0.1, 0.16, 0.01), mat('cardBox', { color: 0x2a2a3a, roughness: 0.5 }), 0.6, 0.825, -0.12);
+  [0xe8b020, 0x2a7ae8, 0xd83a3a, 0x3ab86a, 0xa04ad8].forEach((c, i) => add(g, box(0.035, 0.07, 0.005), mat('cardC' + i, { color: c, roughness: 0.3, metalness: 0.3 }), 0.52 + i * 0.04, 0.89, -0.12 + (i % 2) * 0.03, -0.2, 0, 0));
   // 刷卡器 / 身份证读卡器
   add(g, rbox(0.12, 0.04, 0.16, 0.01), M.black(), 0.7, 1.12, 0.05);
   // 红色座机
@@ -466,8 +469,10 @@ export function makeHeadsetRack() {
     hs.position.set(x, 1.58, 0.07);
     g.add(hs);
   }
-  // 纸箱（新耳机库存）
-  add(g, box(0.5, 0.3, 0.35), M.cardboard(), 0, 0.15, 0.2);
+  // 纸箱（新耳机库存）+ 叠好的毛毯
+  add(g, box(0.5, 0.3, 0.35), M.cardboard(), -0.2, 0.15, 0.2);
+  const bl = mat('blanket', { color: 0x8a2a3a, roughness: 0.95 }), bl2 = mat('blanketBlue', { color: 0x2a4a8a, roughness: 0.95 });
+  for (let i = 0; i < 4; i++) add(g, rbox(0.34, 0.07, 0.26, 0.025), i % 2 ? bl2 : bl, 0.28, 0.04 + i * 0.075, 0.22);
   return g;
 }
 

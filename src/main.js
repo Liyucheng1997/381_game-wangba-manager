@@ -25,14 +25,17 @@ class Engine {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x0a1022);
     this.scene.fog = new THREE.Fog(0x0a1022, 30, 60);
-    this.camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 120);
+    this.camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 120);
     this.camera.position.set(4, 15, 17);
+    this.zoomLevels = [6.5, 10, 15, 22];
+    this.zoomIdx = 1;
+    this.zoomWant = null;
     const c = new OrbitControls(this.camera, r.domElement);
     c.target.set(0, 0.5, 0);
     c.enableDamping = true;
     c.dampingFactor = 0.08;
     c.enablePan = false;
-    c.minDistance = 5; c.maxDistance = 30;
+    c.minDistance = 4; c.maxDistance = 28;
     c.minPolarAngle = 0.25; c.maxPolarAngle = 1.2;
     c.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
     c.rotateSpeed = 0.6;
@@ -46,6 +49,18 @@ class Engine {
     this.follow = null;
     this.overview = false;
     window.addEventListener('resize', () => this.resize());
+    r.domElement.addEventListener('wheel', () => { this.zoomWant = null; }, { passive: true });
+  }
+  // 镜头远近档位
+  setZoom(idx) {
+    this.zoomIdx = Math.max(0, Math.min(this.zoomLevels.length - 1, idx));
+    this.zoomWant = this.zoomLevels[this.zoomIdx];
+  }
+  zoomStep(d) {
+    const dist = this.zoomWant || this.camera.position.distanceTo(this.controls.target);
+    let near = 0;
+    this.zoomLevels.forEach((z, i) => { if (Math.abs(z - dist) < Math.abs(this.zoomLevels[near] - dist)) near = i; });
+    this.setZoom(near + d);
   }
   resize() {
     const w = window.innerWidth, h = window.innerHeight;
@@ -56,7 +71,8 @@ class Engine {
   setOverview(v) { this.overview = v; }
   project(p) {
     const v = new THREE.Vector3(p.x, p.y, p.z).project(this.camera);
-    return { x: (v.x * 0.5 + 0.5) * window.innerWidth, y: (-v.y * 0.5 + 0.5) * window.innerHeight, visible: v.z < 1 && v.z > -1 };
+    const behind = v.z > 1;
+    return { x: (v.x * 0.5 + 0.5) * window.innerWidth, y: (-v.y * 0.5 + 0.5) * window.innerHeight, visible: v.z < 1 && v.z > -1, behind };
   }
   raycast(cx, cy, objects) {
     const ndc = new THREE.Vector2((cx / window.innerWidth) * 2 - 1, -(cy / window.innerHeight) * 2 + 1);
@@ -67,15 +83,21 @@ class Engine {
     const c = this.controls;
     let tgt = null;
     if (this.overview) tgt = new THREE.Vector3(-2.5, 0.5, 0.5);
-    else if (this.follow) tgt = new THREE.Vector3(this.follow.x * 0.75, 0.6, this.follow.z * 0.75 + 0.5);
+    else if (this.follow) tgt = new THREE.Vector3(this.follow.x, 0.7, this.follow.z);
     if (tgt) {
-      const d = tgt.sub(c.target).multiplyScalar(Math.min(1, dt * 2.5));
+      const d = tgt.sub(c.target).multiplyScalar(Math.min(1, dt * 3.5));
       c.target.add(d); this.camera.position.add(d);
     }
     if (this.overview) {
       // 夜间经营：拉远到俯瞰全店
       const want = c.target.clone().add(new THREE.Vector3(3, 17, 15));
       this.camera.position.lerp(want, Math.min(1, dt * 1.5));
+    } else if (this.zoomWant) {
+      const off = this.camera.position.clone().sub(c.target);
+      const dist = off.length();
+      const nd = dist + (this.zoomWant - dist) * Math.min(1, dt * 5);
+      this.camera.position.copy(c.target).add(off.multiplyScalar(nd / dist));
+      if (Math.abs(nd - this.zoomWant) < 0.05) this.zoomWant = null;
     }
     c.update();
     this.composer.render();
@@ -102,7 +124,7 @@ function pickAt(x, y) {
   const objs = [...game.cafe.pickables, ...game.customers.map((c) => c.char.root)];
   const hits = engine.raycast(x, y, objs);
   if (!hits.length) return { hit: null, point: null };
-  let point = null, seat = null, interact = null, customer = null;
+  let point = null, seat = null, interact = null, customer = null, puddle = null;
   for (const h of hits) {
     const o = h.object;
     if (!customer && o.userData.char) {
@@ -110,7 +132,7 @@ function pickAt(x, y) {
       if (c) customer = c;
     }
     if (!seat && o.userData.seatHit) seat = game.cafe.seatById[o.userData.seatHit];
-    if (!interact && o.userData.interact) interact = o.userData.interact;
+    if (!interact && o.userData.interact) { interact = o.userData.interact; puddle = o.userData.puddle || null; }
     if (!point && o.userData.floor) point = h.point;
   }
   if (!point) {
@@ -121,6 +143,7 @@ function pickAt(x, y) {
   }
   let hit = null;
   if (customer) hit = { customer };
+  else if (puddle) hit = { interact, puddle };
   else if (interact && !seat) hit = { interact };
   else if (seat) hit = { seat };
   else if (interact) hit = { interact };
@@ -151,6 +174,8 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Digit3' && !ui.dialog.classList.contains('show')) game.speed = 3;
   if (e.code === 'KeyP') togglePause();
   if (e.code === 'KeyE' && game.modal === 0) game.goCheckinFront();
+  if (e.code === 'KeyZ' || e.code === 'Equal' || e.code === 'NumpadAdd') engine.zoomStep(-1);
+  if (e.code === 'KeyX' || e.code === 'Minus' || e.code === 'NumpadSubtract') engine.zoomStep(1);
 });
 window.addEventListener('keyup', (e) => { keys[e.code] = false; });
 
@@ -167,6 +192,15 @@ document.querySelectorAll('#speed button').forEach((b) => (b.onclick = () => {
 }));
 document.getElementById('pause-mask').onclick = togglePause;
 document.getElementById('btn-mute').onclick = (e) => { audio.setMuted(!audio.muted); e.currentTarget.textContent = audio.muted ? '🔇' : '🔊'; };
+document.getElementById('btn-music').onclick = (e) => { const on = audio.toggleMusic(); e.currentTarget.classList.toggle('off', !on); };
+document.getElementById('btn-zin').onclick = () => engine.zoomStep(-1);
+document.getElementById('btn-zout').onclick = () => engine.zoomStep(1);
+document.getElementById('btn-ach').onclick = () => {
+  if (game.phase !== 'play') return;
+  game.modal++;
+  ui.showAchievements(game, () => { game.modal--; });
+};
+document.getElementById('btn-ach-title').onclick = () => ui.showAchievements(game);
 
 // 标题画面
 const title = document.getElementById('title-screen');
@@ -175,12 +209,19 @@ const btnCont = document.getElementById('btn-continue');
 if (Game.hasSave()) btnCont.style.display = '';
 engine.controls.autoRotate = true;
 engine.controls.autoRotateSpeed = 0.35;
-function begin(load) {
+async function begin(load) {
   audio.init();
+  let ok = load && game.load();
+  if (!ok) {
+    title.style.display = 'none';
+    const diff = await ui.chooseDifficulty();
+    game.newState(diff);
+  }
   title.classList.add('hide');
   engine.controls.autoRotate = false;
-  if (load && game.load()) { /* 读档 */ } else game.newState();
   engine.follow = game.player;
+  engine.setZoom(1);
+  audio.startMusic();
   setTimeout(() => { title.style.display = 'none'; }, 900);
   game.startDay();
 }
@@ -220,8 +261,9 @@ function loop() {
       const { hit } = pickAt(mouse.x, mouse.y);
       const t = game.onHover(hit);
       ui.showTooltip(t, mouse.x, mouse.y);
+      game.setHover(hit);
       canvas.style.cursor = hit ? 'pointer' : 'default';
-    } else ui.showTooltip(null);
+    } else { ui.showTooltip(null); game.setHover(null); }
   }
 }
 loop();

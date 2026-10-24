@@ -24,6 +24,7 @@ export const P = {
   dispenser: { x: 9.05, z: 1.95 },
   trash: { x: 4.3, z: 3.55 },
   router: { x: 7.6, z: 1.75 },
+  cards: { x: 7.05, z: 1.75 },
   wc: { x: 6.8, z: -6.3 },
 };
 
@@ -448,7 +449,9 @@ export class Cafe {
     mat1.castShadow = false;
 
     // 交互热区（不可见拾取盒）
+    this.hotspots = {};
     const hot = (name, x, z, w, d, h = 1.8, y = 0) => {
+      this.hotspots[name] = { x, z };
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial({ visible: false }));
       m.position.set(x, y + h / 2, z);
       m.userData.interact = name;
@@ -463,6 +466,7 @@ export class Cafe {
     hot('trash', 4.3, 3.05, 0.45, 0.45, 0.7);
     hot('router', 8.05, 2.5, 0.35, 0.3, 0.3, 0.75);
     hot('counter', 5.7, 2.62, 1.6, 0.62, 1.2);
+    hot('cards', 7.1, 2.5, 0.45, 0.35, 0.35, 0.78);
     this.ac = makeAC();
     this.ac.position.set(-9.55, 0, -6.55);
     this.ac.rotation.y = Math.PI / 4;

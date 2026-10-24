@@ -81,6 +81,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #05070d; col
 
 /* ---------- 浮动元素 ---------- */
 #bubbles, #floats { position: absolute; inset: 0; pointer-events: none; z-index: 3; overflow: hidden; }
+#bubbles { z-index: 4; }
 .bubble { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; will-change: transform; }
 .bubble .ring { width: 38px; height: 38px; border-radius: 50%; padding: 3px; box-shadow: 0 3px 10px rgba(0, 0, 0, .5); }
 .bubble .ring span { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; background: #fff; border-radius: 50%; font-size: 19px; }
@@ -245,3 +246,102 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #05070d; col
 .help-grid b { color: var(--gold); margin-right: 4px; }
 .help-goal { background: rgba(255, 210, 74, .1); padding: 10px 14px; border-radius: 10px; margin: 16px 0; }
 .help-goal b { color: var(--gold); }
+
+/* ================= v1.1：显示优化与新界面 ================= */
+html { font-size: 15px; }
+.topbar { height: 58px; }
+.brand { display: flex; align-items: center; gap: 2px; }
+.brand .lvl { display: flex; flex-direction: column; margin-left: 10px; font-size: 11px; color: var(--dim); font-weight: normal; letter-spacing: 0; line-height: 1.2; }
+.brand .lvl b { color: #7dffb0; font-size: 13px; }
+.brand .lvl .xpbar { width: 54px; height: 4px; background: rgba(255,255,255,.12); border-radius: 2px; overflow: hidden; margin: 2px 0; }
+.brand .lvl .xpbar i { display: block; height: 100%; width: 0; background: #7dffb0; transition: width .3s; }
+.zoom { display: flex; }
+.zoom .iconbtn { width: auto; padding: 0 6px; font-size: 13px; }
+.iconbtn.off { opacity: .35; }
+
+#tasks { width: 280px; top: 80px; }
+.task .tx { font-size: 13.5px; }
+.task .ic { font-size: 24px; width: 30px; }
+
+/* 更大的头顶气泡 + 屏幕外贴边提示 */
+.bubble { pointer-events: auto; cursor: pointer; }
+.bubble .ring { width: 50px; height: 50px; padding: 4px; position: relative; }
+.bubble .ring span { font-size: 25px; }
+.bubble .badge { position: absolute; right: -8px; top: -6px; font-style: normal; font-size: 15px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
+.bubble .badge:empty { display: none; }
+.bubble .lbl { font-size: 13px; padding: 2px 9px; }
+.bubble .arrow { display: none; position: absolute; left: 50%; top: 50%; width: 0; height: 0; margin: -9px 0 0 -9px; border: 9px solid transparent; transform-origin: 9px 9px; }
+.bubble.edge .ring { width: 42px; height: 42px; opacity: .92; box-shadow: 0 0 0 2px rgba(255,255,255,.7), 0 4px 14px rgba(0,0,0,.6); }
+.bubble.edge .ring span { font-size: 20px; }
+.bubble.edge .arrow { display: block; }
+.bubble.edge .arrow::after { content: ''; position: absolute; left: 25px; top: -7px; border: 7px solid transparent; border-left: 11px solid #ffd84a; }
+.bubble.edge .lbl { display: none; }
+
+/* 手上物品：可点击放回 */
+#hand .item { font-family: var(--font); font-size: 13px; color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+#hand .item b { font-size: 10px; color: #ff9aa8; opacity: .7; }
+#hand .item:hover { background: rgba(255, 90, 110, .25); border-color: #ff7a8a; }
+#hand .item:hover b { opacity: 1; }
+#stock { font-size: 14px; }
+
+/* 小地图 */
+#minimap { position: absolute; right: 10px; bottom: 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 8px; backdrop-filter: blur(10px); }
+#minimap .mm-h { font-size: 12px; color: var(--dim); margin: 0 2px 5px; letter-spacing: 1px; }
+#minimap .mm-h small { opacity: .7; }
+#minimap canvas { display: block; width: 252px; height: 204px; border-radius: 8px; cursor: pointer; }
+#toasts { top: 80px; }
+.toast.ach { border-left-color: #ffd84a; background: linear-gradient(90deg, rgba(90,70,10,.95), rgba(30,30,40,.95)); font-weight: bold; }
+
+/* 拿货选择器 */
+.picker { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); z-index: 35; background: linear-gradient(180deg, #1c2130, #11141d); border: 1px solid rgba(255,255,255,.16); border-radius: 16px; padding: 14px 16px; box-shadow: 0 14px 40px rgba(0,0,0,.6); animation: pkin .2s; min-width: 320px; }
+.pk-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; }
+.pk-title small { color: var(--dim); font-weight: normal; margin-left: 8px; font-size: 12px; }
+.pk-items { display: flex; gap: 10px; margin-bottom: 10px; }
+.pk-item { flex: 1; font-family: var(--font); color: var(--text); background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); border-radius: 12px; padding: 12px 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; position: relative; transition: all .15s; }
+.pk-item:hover:not(:disabled) { background: rgba(255,210,74,.15); border-color: var(--gold); transform: translateY(-2px); }
+.pk-item:disabled { opacity: .35; cursor: not-allowed; }
+.pk-item.want { border-color: rgba(125,255,176,.6); box-shadow: 0 0 12px rgba(125,255,176,.2); }
+.pk-ic { font-size: 30px; }
+.pk-item small { color: var(--dim); font-size: 11px; }
+.pk-item em { position: absolute; top: -9px; right: -6px; font-style: normal; font-size: 11px; background: #2a8a4a; color: #fff; padding: 1px 7px; border-radius: 999px; }
+.pk-done { width: 100%; }
+
+/* 难度选择 */
+#modal.diff .panel { width: min(760px, 94vw); }
+.diff-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
+.diff-card { font-family: var(--font); color: var(--text); text-align: left; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.14); border-radius: 14px; padding: 16px; cursor: pointer; transition: all .15s; }
+.diff-card:hover { border-color: var(--gold); background: rgba(255,210,74,.1); transform: translateY(-3px); }
+.diff-card.rec { border-color: rgba(255,210,74,.55); }
+.diff-card .d-ic { font-size: 30px; display: block; margin-bottom: 6px; }
+.diff-card b { font-size: 18px; } .diff-card b em { font-style: normal; font-size: 11px; background: var(--gold); color: #2a1a00; padding: 1px 6px; border-radius: 999px; margin-left: 6px; vertical-align: middle; }
+.diff-card p { font-size: 13px; color: #c8cede; line-height: 1.6; margin: 8px 0; }
+.diff-card small { color: var(--dim); font-size: 12px; }
+
+/* 成就 */
+#modal.achp .panel { width: min(720px, 94vw); }
+.mg-title small { font-size: 13px; color: var(--dim); font-weight: normal; }
+.ach-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
+.ach { display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,.04); border-radius: 10px; padding: 8px 10px; opacity: .5; }
+.ach.got { opacity: 1; background: rgba(255,210,74,.1); border: 1px solid rgba(255,210,74,.3); }
+.ach span { font-size: 24px; width: 30px; text-align: center; }
+.ach b { display: block; font-size: 14px; } .ach small { color: var(--dim); font-size: 12px; }
+
+/* 技能 */
+.skill-head { background: rgba(125,255,176,.07); border: 1px solid rgba(125,255,176,.25); border-radius: 12px; padding: 12px; margin-bottom: 4px; }
+.skill-head b { font-size: 17px; color: #7dffb0; }
+.skill-head .xpbar { height: 6px; background: rgba(255,255,255,.1); border-radius: 3px; overflow: hidden; margin: 6px 0; }
+.skill-head .xpbar i { display: block; height: 100%; background: #7dffb0; }
+.skill-head small { color: var(--dim); } .skill-head .sp { color: var(--gold); font-size: 15px; }
+.skill-head .desc { font-size: 12px; color: var(--dim); margin: 6px 0 0; }
+.pips { color: var(--gold); letter-spacing: 2px; font-size: 13px; margin-left: 6px; }
+.mg-tip { font-size: 13px; color: #7dffb0; margin: 8px 0 0; }
+.topbar { gap: 12px; white-space: nowrap; }
+.topbar > * { flex-shrink: 0; }
+.topbar .grow { flex-shrink: 1; min-width: 0; }
+.brand .bname { white-space: nowrap; }
+.date span { max-width: 170px; overflow: hidden; text-overflow: ellipsis; }
+.zoom { align-items: center; background: rgba(0,0,0,.3); border-radius: 8px; padding: 0 4px 0 8px; }
+.zoom span { font-size: 12px; color: var(--dim); margin-right: 2px; }
+.zoom .iconbtn { font-size: 16px; width: 28px; padding: 0; }
+@media (max-width: 1280px) { .stat.money small { display: none; } .topbar { gap: 8px; } }
+@keyframes pkin { from { margin-bottom: -12px; } }

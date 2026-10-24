@@ -13,7 +13,7 @@
 
     <div id="hud">
       <div class="topbar">
-        <div class="brand"><span class="logo">极速</span>网吧</div>
+        <div class="brand"><span class="bname"><span class="logo">极速</span>网吧</span><div class="lvl"><b id="h-level">Lv.1</b><div class="xpbar"><i id="h-xp"></i></div><span id="h-diff"></span></div></div>
         <div class="sep"></div>
         <div class="date"><b id="h-day">第1天</b><span id="h-date"></span></div>
         <div class="clock" id="h-clock">09:00</div>
@@ -24,12 +24,16 @@
         <div class="stat"><span>排队</span><b id="h-queue">0</b></div>
         <div class="grow"></div>
         <div id="speed"><button data-s="0" title="暂停 (P)">⏸</button><button data-s="1" title="正常 (1)">▶</button><button data-s="2" title="2倍速 (2)">⏩</button><button data-s="3" title="3倍速 (3)">⏭</button></div>
+        <div class="zoom" title="镜头远近（Z / X 或滚轮）"><span>镜头</span><button id="btn-zin" class="iconbtn">＋</button><button id="btn-zout" class="iconbtn">－</button></div>
+        <button id="btn-ach" class="iconbtn" title="成就">🏆</button>
+        <button id="btn-music" class="iconbtn" title="背景音乐">🎵</button>
         <button id="btn-mute" class="iconbtn" title="静音">🔊</button>
         <button id="btn-help2" class="iconbtn" title="帮助">❔</button>
       </div>
       <div id="tasks"><div class="tasks-h">待办事项</div><div id="tasks-list"></div></div>
       <div id="bottombar"><div id="hand"></div><div id="stock"></div></div>
       <div id="hint"></div>
+      <div id="minimap"><div class="mm-h">店内地图 <small>点击前往</small></div><canvas width="252" height="204"></canvas></div>
     </div>
 
     <div id="tooltip"></div>
@@ -54,11 +58,12 @@
         <div class="t-year">2006 · 青石县</div>
         <h1 class="t-logo"><span>网管</span>日记</h1>
         <div class="t-sub">极速网吧模拟器</div>
-        <p class="t-desc">舅舅住院，把网吧交给了高考落榜的你。<br>十天后，要交上六千块房租——否则，这家店就要易主。</p>
+        <p class="t-desc">舅舅住院，把网吧交给了高考落榜的你。<br>十天后，要交上三个月的房租——否则，这家店就要易主。</p>
         <div class="t-btns">
           <button class="btn primary big" id="btn-new">新的开始</button>
           <button class="btn big" id="btn-continue" style="display:none">继续上一天</button>
           <button class="btn ghost" id="btn-help">操作说明</button>
+          <button class="btn ghost" id="btn-ach-title">🏆 成就</button>
         </div>
         <div class="t-foot">建议使用电脑浏览器 · 戴上耳机体验键盘声与“嘀嘀嘀”</div>
       </div>
@@ -70,8 +75,14 @@
         <div class="help-grid">
           <div><b>🖱 左键</b>点地面走路；点客人、座位、冰柜等直接交互</div>
           <div><b>🖱 右键拖动</b>旋转视角；<b>滚轮</b>缩放</div>
-          <div><b>⌨ WASD</b>直接控制网管走动</div>
+          <div><b>⌨ WASD</b>直接控制网管走动；<b>Z / X</b> 镜头拉近 / 拉远</div>
           <div><b>E</b>快速回前台开卡　<b>P</b>暂停　<b>1/2/3</b>倍速</div>
+          <div><b>🗺 小地图</b>右下角，点哪里就去哪里；屏幕外的需求会贴边提示</div>
+          <div><b>✋ 手上</b>空手能拿 2 样、托盘 4 样，点底部物品可以放回</div>
+          <div><b>🌭 加肠</b>货架拿面和火腿肠，面加热水后一起送去</div>
+          <div><b>💳 点卡</b>收银台点卡盒拿；<b>🛌 毛毯</b>杂物架拿，给深夜睡着的客人</div>
+          <div><b>💧 水渍</b>下雪天或打翻饮料会有水渍，点它拖干净，不然有人滑倒</div>
+          <div><b>🎓 技能</b>干活攒经验升级，夜间学习飞毛腿、巧手、好口才等技能</div>
           <div><b>🪪 开卡</b>客人在前台排队，点他开卡收钱。❓表示看着面嫩，可以查身份证</div>
           <div><b>🍜 泡面</b>货架拿面 → 饮水机加热水 → 送到座位</div>
           <div><b>🥤 饮料</b>冰柜拿饮料送过去；<b>🎧 耳机</b>耳机架拿新的</div>
@@ -81,7 +92,7 @@
           <div><b>📶 断网</b>去收银台点路由器重启</div>
           <div><b>🌙 夜间</b>打烊后可添置电脑、升级设备、雇人、进货、调价</div>
         </div>
-        <p class="help-goal">目标：第十天晚上，账上要有 <b>¥6000</b> 交房租。口碑越高，客人越多。</p>
+        <p class="help-goal">目标：第十天晚上，账上要攒够房租（休闲 <b>¥5000</b> / 标准 <b>¥6000</b> / 挑战 <b>¥8000</b>）。口碑越高，客人越多。</p>
         <button class="btn primary close">知道了</button>
       </div>
     </div>

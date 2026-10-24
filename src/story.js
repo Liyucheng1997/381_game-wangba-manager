@@ -2,7 +2,6 @@
 // 对话行格式：[说话人, 文本]；说话人 me=主角 sys=旁白
 // 控制节点：{choice:[{t, do, then}]} / {if, then, else} / {do}
 
-export const TARGET = 6000; // 第十天要交的房租
 
 export const CAST = {
   me: { name: '我', title: '网管 · 林小川', look: { gender: 'm', hair: 'messy', top: 'staff', topColor: 0x2a2d36, topColor2: 0x14161a, pants: 0x26324a, shoes: 0xeeeeee, skin: 0xf1c9a5, hairColor: 0x1a1410, height: 1.0, build: 1, glasses: false } },
@@ -73,9 +72,9 @@ export const DAYS = [
       L('uncle', '网吧这摊子，交给你了。'),
       L('me', '我？舅，我就会打CS啊……'),
       L('uncle', '会打CS就够了！当网管，一半靠手艺，一半靠眼力见儿。'),
-      L('uncle', '说句实话，店里欠了房东赵老板三个月房租。十天后，也就是27号，得把这6000块交上。'),
+      L('uncle', '说句实话，店里欠了房东赵老板三个月房租。十天后，也就是27号，得把这{target}块交上。'),
       L('uncle', '交不上……这店就得让给对门那个要开“电竞馆”的。'),
-      L('me', '六千？！'),
+      L('me', '{target}？！'),
       L('uncle', '柜台里给你留了1000块周转。我教你几招，听好了——'),
       L('sys', '【操作】鼠标左键点地面移动；右键拖动旋转视角；滚轮缩放。WASD 也能走。'),
       L('sys', '【开卡】客人到前台排队，点他就会走到收银位帮他开机。看着面嫩的，记得查身份证。'),
@@ -429,8 +428,8 @@ export const DAYS = [
     date: '2006年12月27日 星期三', weather: '晴 -6℃', title: '第十天 · 交租日',
     intro: [
       L('sys', '十天，一晃就过去了。'),
-      L('me', `今晚房东就来收租。目标：${TARGET}块。`),
-      { if: (g) => g.state.money >= TARGET, then: [L('me', '钱已经够了。最后一天，站好最后一班岗。')], else: [L('me', '还差{gapNow}块……拼了！')] },
+      L('me', '今晚房东就来收租。目标：{target}块。'),
+      { if: (g) => g.state.money >= g.target, then: [L('me', '钱已经够了。最后一天，站好最后一班岗。')], else: [L('me', '还差{gapNow}块……拼了！')] },
     ],
     events: [
       {
@@ -451,10 +450,10 @@ export const DAYS = [
 
 // 结局判定
 export function finaleScript(g) {
-  const paid = g.state.money >= TARGET;
+  const paid = g.state.money >= g.target;
   const lines = [
     L('sys', '晚上十点，门帘一掀，房东赵老板裹着军大衣走了进来。'),
-    L('zhaolaoban', '小林啊，今天27号了。三个月房租，六千，准备好了吧？'),
+    L('zhaolaoban', '小林啊，今天27号了。三个月房租，{target}块，准备好了吧？'),
   ];
   if (paid) {
     lines.push(
@@ -462,7 +461,7 @@ export function finaleScript(g) {
       L('sys', '你把一沓用皮筋扎好的钞票推到了柜台上。'),
       L('zhaolaoban', '……嘿！行啊小子！建国有你这个外甥，有福气！'),
       L('zhaolaoban', '对门那姓钱的天天找我要这铺面，我早烦他了。这店，继续租给你们！'),
-      { do: (g) => g.money(-TARGET, 'other', '房租') },
+      { do: (g) => g.money(-g.target, 'other', '房租') },
       L('sys', '门帘再次被掀开。'),
       L('uncle', '小川！'),
       L('me', '舅？！你怎么回来了？'),

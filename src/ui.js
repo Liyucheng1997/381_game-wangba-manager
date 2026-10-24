@@ -1,7 +1,7 @@
 // HUD、对话框、商店、小游戏等全部 DOM 界面
-import { CAST, TARGET } from './story.js';
+import { CAST } from './story.js';
 import { Portraits } from './portrait.js';
-import { NEED_INFO, CFG } from './game.js';
+import { DIFF, SKILLS, ACHIEVEMENTS } from './game.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
@@ -9,7 +9,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
 const BUY_ORDER = ['B', 'E', 'A', 'F'];
-const ITEM_NAMES = { noodle_dry: '🍜 泡面（干）', noodle: '🍜 泡面（已泡）', drink: '🥤 饮料', headset: '🎧 耳机' };
+const ITEM_NAMES = { noodle_dry: '🍜 泡面（干）', noodle: '🍜 泡面（已泡）', drink: '🥤 饮料', headset: '🎧 耳机', sausage: '🌭 火腿肠', card: '💳 点卡', blanket: '🛌 毛毯' };
+const ITEM_ICON = { noodle_dry: '🍜', drink: '🥤', headset: '🎧', sausage: '🌭', card: '💳', blanket: '🛌' };
+
+// 小地图坐标范围
+const MM = { x0: -10.6, x1: 10.6, z0: -7.4, z1: 9.6 };
 
 function nextSlot(g) {
   for (const r of BUY_ORDER) {
@@ -37,7 +41,8 @@ const SHOP = [
       { id: 'neon', icon: '🌈', name: '霓虹门头招牌', desc: '门口亮起“极速网吧”霓虹灯，客流+15%。', price: () => 600 },
       { id: 'idscan', icon: '🪪', name: '身份证读卡器', desc: '开卡时自动识别年龄，未成年人一眼看穿。', price: () => 300 },
       { id: 'extinguisher', icon: '🧯', name: '灭火器', desc: '消防检查必备。', price: () => 120 },
-      { id: 'tray', icon: '🍽️', name: '送餐托盘', desc: '一次能端 3 样东西。', price: () => 50 },
+      { id: 'tray', icon: '🍽️', name: '送餐托盘', desc: '一次能端 4 样东西（空手只能拿 2 样）。', price: () => 50 },
+      { id: 'member', icon: '💳', name: '会员卡系统', desc: '部分客人会办卡充值（30~50 元），会员满意度更高，客流 +12%。', price: () => 400 },
     ],
   },
   {
@@ -51,8 +56,12 @@ const SHOP = [
       { id: 'st_noodle', icon: '🍜', name: '康帅傅泡面 ×24', desc: '售价 4 元/桶。', price: () => 36, repeat: true, buy: (g) => (g.state.stock.noodle += 24), stat: (g) => `库存 ${g.state.stock.noodle}` },
       { id: 'st_drink', icon: '🥤', name: '饮料 ×24', desc: '可乐、冰红茶、红牛混装，售价 3 元/瓶。', price: () => 29, repeat: true, buy: (g) => (g.state.stock.drink += 24), stat: (g) => `库存 ${g.state.stock.drink}` },
       { id: 'st_headset', icon: '🎧', name: '耳机 ×3', desc: '网吧耳机消耗品，客人耳机坏了要换。', price: () => 36, repeat: true, buy: (g) => (g.state.stock.headset += 3), stat: (g) => `库存 ${g.state.stock.headset}` },
+      { id: 'st_sausage', icon: '🌭', name: '火腿肠 ×20', desc: '“泡面加肠”一份卖 6 元。', price: () => 20, repeat: true, buy: (g) => (g.state.stock.sausage += 20), stat: (g) => `库存 ${g.state.stock.sausage}` },
+      { id: 'st_card', icon: '💳', name: '游戏点卡 ×10', desc: '传奇 / 魔兽 / QQ币点卡，进价 24，卖 30 元。', price: () => 240, repeat: true, buy: (g) => (g.state.stock.card += 10), stat: (g) => `库存 ${g.state.stock.card}` },
+      { id: 'st_blanket', icon: '🛌', name: '毛毯 ×3', desc: '深夜给睡着的客人盖上，客人走后会收回来重复使用。', price: () => 60, repeat: true, buy: (g) => (g.state.stock.blanket += 3), stat: (g) => `现有 ${g.state.stock.blanket} 条` },
     ],
   },
+  { tab: '技能', items: [] },
   { tab: '定价', items: [] },
 ];
 
@@ -105,21 +114,38 @@ export class UI {
     // 气泡
     const seen = new Set();
     if (game.phase === 'play' || game.phase === 'intro') {
+      const W = window.innerWidth, H = window.innerHeight;
       for (const b of game.bubbles()) {
         const p = this.engine.project(b.pos);
         let e = this.bubbleEls.get(b.id);
         if (!e) {
-          e = el('div', 'bubble', '<div class="ring"><span></span></div><div class="lbl"></div>');
+          e = el('div', 'bubble', '<div class="ring"><span></span><em class="badge"></em><i class="arrow"></i></div><div class="lbl"></div>');
           this.layerBubbles.appendChild(e);
           this.bubbleEls.set(b.id, e);
+          e.addEventListener('pointerdown', (ev) => { ev.stopPropagation(); if (ev.button === 0 && e._click) e._click(); });
         }
         seen.add(b.id);
-        e.style.display = p.visible ? '' : 'none';
-        e.style.transform = `translate(${p.x}px,${p.y}px) translate(-50%,-100%)`;
+        e._click = b.click;
+        let x = p.x, y = p.y;
+        const mx = 40, top = 96, bot = 70;
+        const off = p.behind || x < mx || x > W - mx || y < top || y > H - bot;
+        if (off && !b.icon) { e.style.display = 'none'; continue; }
+        e.style.display = '';
+        e.classList.toggle('edge', off);
+        if (off) {
+          if (p.behind) { x = W - x; y = H - y; }
+          const cx = W / 2, cy = (top + H - bot) / 2;
+          const dx = x - cx, dy = y - cy;
+          const k = Math.min((W / 2 - mx) / Math.max(1, Math.abs(dx)), ((H - top - bot) / 2) / Math.max(1, Math.abs(dy)));
+          x = cx + dx * k; y = cy + dy * k + 22;
+          e.querySelector('.arrow').style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
+        }
+        e.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%)`;
+        e.querySelector('.badge').textContent = b.badge || '';
         const ring = e.firstChild;
         ring.style.display = b.icon ? '' : 'none';
         if (b.icon) {
-          ring.firstChild.textContent = b.icon;
+          if (ring.firstChild.textContent !== b.icon) ring.firstChild.textContent = b.icon;
           const col = b.cls === 'talk' ? '#5ad1ff' : b.cls === 'good' ? '#5aff8a' : b.ratio > 0.5 ? '#ffd84a' : b.ratio > 0.25 ? '#ff9a3a' : '#ff3a4a';
           ring.style.background = `conic-gradient(${col} ${b.ratio * 360}deg, rgba(0,0,0,0.35) 0)`;
           ring.classList.toggle('urgent', b.ratio < 0.25 && b.cls !== 'talk');
@@ -140,7 +166,8 @@ export class UI {
     $('#h-date').textContent = game.dayDef ? game.dayDef.date.replace(/^2006年/, '') + ' · ' + game.dayDef.weather : '';
     $('#h-clock').textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     $('#h-money').textContent = st.money.toLocaleString();
-    const gap = TARGET - st.money;
+    this.drawMinimap(game);
+    const gap = game.target - st.money;
     $('#h-target').textContent = gap > 0 ? `距房租还差 ¥${gap}` : '房租已够 ✓';
     $('#h-target').classList.toggle('done', gap <= 0);
     $('#h-rep').style.width = st.rep + '%';
@@ -150,21 +177,34 @@ export class UI {
     const owned = game.cafe.seats.filter((s) => s.owned).length;
     $('#h-online').textContent = `${seated}/${owned}`;
     $('#h-queue').textContent = game.queue.length;
+    const [xpIn, xpNeed] = game.levelProgress();
+    $('#h-level').textContent = `Lv.${game.level}`;
+    $('#h-xp').style.width = (xpIn / xpNeed * 100) + '%';
+    $('#h-diff').textContent = game.diffCfg.label;
     // 任务列表
     const list = game.needsList().slice(0, 9);
     const tasks = $('#tasks-list');
     tasks.innerHTML = '';
     if (!list.length) tasks.appendChild(el('div', 'empty', '暂时没有待办 ☕'));
     for (const n of list) {
-      const row = el('div', 'task' + (n.ratio < 0.25 && n.type !== 'talk' ? ' urgent' : ''), `<span class="ic">${n.info.icon}</span><div class="tx"><b>${n.where}</b> ${n.name}<small>${n.info.text}</small><div class="pb"><i style="width:${Math.max(0, n.ratio) * 100}%"></i></div></div>`);
-      row.onclick = () => game.clickCustomer(n.c);
+      const row = el('div', 'task' + (n.ratio < 0.25 && n.type !== 'talk' && n.type !== 'puddle' ? ' urgent' : ''), `<span class="ic">${n.info.icon}</span><div class="tx"><b>${n.where}</b> ${n.name}<small>${n.info.text}</small><div class="pb"><i style="width:${Math.max(0, n.ratio) * 100}%"></i></div></div>`);
+      row.onpointerdown = (ev) => { if (ev.button === 0) n.click(); };
       tasks.appendChild(row);
     }
     // 手上
     const hand = game.player.hand;
-    $('#hand').innerHTML = `<span class="lab">手上</span>` + (hand.length ? hand.map((i) => `<span class="item">${ITEM_NAMES[i]}</span>`).join('') : '<span class="none">空</span>') + (game.player.cap > 1 ? `<span class="cap">${hand.length}/${game.player.cap}</span>` : '');
+    const handKey = hand.join(',') + '/' + game.player.cap;
+    if (handKey !== this.handKey) {
+      this.handKey = handKey;
+      $('#hand').innerHTML = `<span class="lab">手上</span>` + (hand.length ? hand.map((it, i) => `<button class="item" data-i="${i}" title="点击放回">${ITEM_NAMES[it]}<b>✕</b></button>`).join('') : '<span class="none">空着</span>') + `<span class="cap">${hand.length}/${game.player.cap}</span>`;
+    }
+    if (!this.handBound) {
+      this.handBound = true;
+      $('#hand').addEventListener('pointerdown', (ev) => { const b = ev.target.closest('[data-i]'); if (b) game.dropItem(+b.dataset.i); });
+    }
     const s = st.stock;
-    $('#stock').innerHTML = `<span class="${s.noodle < 6 ? 'low' : ''}">🍜${s.noodle}</span><span class="${s.drink < 6 ? 'low' : ''}">🥤${s.drink}</span><span class="${s.headset < 2 ? 'low' : ''}">🎧${s.headset}</span>`;
+    const low = (v, n) => (v < n ? 'low' : '');
+    $('#stock').innerHTML = `<span class="${low(s.noodle, 6)}" title="泡面">🍜${s.noodle}</span><span class="${low(s.sausage, 4)}" title="火腿肠">🌭${s.sausage}</span><span class="${low(s.drink, 6)}" title="饮料">🥤${s.drink}</span><span class="${low(s.card, 2)}" title="点卡">💳${s.card}</span><span class="${low(s.headset, 2)}" title="耳机">🎧${s.headset}</span><span title="可用毛毯">🛌${s.blanket}</span>`;
     // 进度条（玩家动作）
     const pa = game.player.action;
     const pb = $('#player-progress');
@@ -175,6 +215,105 @@ export class UI {
       pb.firstChild.style.width = Math.min(100, (pa.t / pa.dur) * 100) + '%';
     } else pb.style.display = 'none';
     document.querySelectorAll('#speed button').forEach((b) => b.classList.toggle('on', +b.dataset.s === game.speed));
+  }
+
+  // ---------- 小地图 ----------
+  drawMinimap(game) {
+    const cv = $('#minimap canvas');
+    if (!cv) return;
+    if (!this.mmBound) {
+      this.mmBound = true;
+      cv.addEventListener('pointerdown', (ev) => {
+        const r = cv.getBoundingClientRect();
+        const x = MM.x0 + (ev.clientX - r.left) / r.width * (MM.x1 - MM.x0);
+        const z = MM.z0 + (ev.clientY - r.top) / r.height * (MM.z1 - MM.z0);
+        game.minimapClick(x, z);
+      });
+    }
+    const ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
+    const sx = W / (MM.x1 - MM.x0), sz = H / (MM.z1 - MM.z0);
+    const X = (x) => (x - MM.x0) * sx, Z = (z) => (z - MM.z0) * sz;
+    const rect = (x, z, w, d, col) => { ctx.fillStyle = col; ctx.fillRect(X(x - w / 2), Z(z - d / 2), w * sx, d * sz); };
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(10,14,24,0.9)'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#d9d2c0'; ctx.fillRect(X(-10), Z(-7), 20 * sx, 14 * sz);
+    ctx.fillStyle = '#5b5f66'; ctx.fillRect(X(-10.6), Z(7.2), 21.2 * sx, 3 * sz);
+    ctx.strokeStyle = '#4f8a6a'; ctx.lineWidth = 2; ctx.strokeRect(X(-10), Z(-7), 20 * sx, 14 * sz);
+    ctx.clearRect(X(6.45), Z(6.9), 1.5 * sx, 0.3 * sz); ctx.fillStyle = '#b08a5a'; ctx.fillRect(X(6.45), Z(6.9), 1.5 * sx, 0.3 * sz);
+    if (game.state.up.vip) { ctx.strokeStyle = '#a07ad8'; ctx.strokeRect(X(0.6), Z(-7), 5.1 * sx, 3.4 * sz); }
+    rect(6.5, 2.62, 3.8, 0.62, '#6a3a1a');
+    rect(6.4, 0.45, 1.6, 0.4, '#c84a3a');
+    rect(9.6, 0.95, 0.66, 0.7, '#e8f4ff');
+    rect(9.7, 1.95, 0.32, 0.32, '#5aa8ff');
+    rect(5.0, 0.35, 1.0, 0.4, '#8a6a3a');
+    const needIcon = {};
+    for (const c of game.customers) if (c.need && c.seat) needIcon[c.seat.id] = c.need;
+    for (const s of game.cafe.seats) {
+      if (s.type === 'vip' && !game.state.up.vip) continue;
+      const horiz = Math.abs(s.fz) > 0.5;
+      const w = horiz ? 1.0 : 0.6, d = horiz ? 0.6 : 1.0;
+      const n = needIcon[s.id];
+      let col = !s.owned ? '#9a968a' : s.broken || s.virus ? '#e04848' : n ? (n.t / n.max < 0.3 ? '#ff5a3a' : '#ffc23a') : s.customer ? '#3fae5a' : s.mess ? '#a07040' : '#f4f1ea';
+      rect((s.x + s.desk.x) / 2, (s.z + s.desk.z) / 2, w, d, col);
+    }
+    ctx.font = `${Math.round(11 * W / 240)}px "Segoe UI Emoji","Apple Color Emoji",sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const c of game.customers) {
+      if (c.seatedOn) continue;
+      ctx.fillStyle = c.need ? '#ffd84a' : '#5ab8ff';
+      ctx.beginPath(); ctx.arc(X(c.x), Z(c.z), 2.6, 0, 7); ctx.fill();
+    }
+    for (const p of game.puddles) { ctx.fillStyle = '#4aa8ff'; ctx.beginPath(); ctx.arc(X(p.x), Z(p.z), 3.5, 0, 7); ctx.fill(); }
+    for (const st of game.staff) { ctx.fillStyle = '#c08aff'; ctx.beginPath(); ctx.arc(X(st.x), Z(st.z), 3, 0, 7); ctx.fill(); }
+    const pl = game.player;
+    ctx.save(); ctx.translate(X(pl.x), Z(pl.z)); ctx.rotate(-pl.rot + Math.PI);
+    ctx.fillStyle = '#ffd84a'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(4.5, 5); ctx.lineTo(-4.5, 5); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---------- 拿货选择器 ----------
+  picker(game, title, opts) {
+    return new Promise((res) => {
+      const box = el('div', 'picker');
+      document.body.appendChild(box);
+      const close = () => { box.remove(); window.removeEventListener('keydown', key); res(); };
+      const key = (e) => { if (e.code === 'Escape' || e.code === 'Space') close(); };
+      window.addEventListener('keydown', key);
+      const render = () => {
+        const pl = game.player, st = game.state.stock;
+        box.innerHTML = `<div class="pk-title">${title} <small>手上 ${pl.hand.length}/${pl.cap}</small></div><div class="pk-items">${opts.map((o, i) => {
+          const can = st[o.stockKey] > 0 && pl.hand.length < pl.cap;
+          return `<button class="pk-item ${o.need > 0 ? 'want' : ''}" data-i="${i}" ${can ? '' : 'disabled'}><span class="pk-ic">${ITEM_ICON[o.item]}</span><b>${o.name}</b><small>库存 ${st[o.stockKey]}</small>${o.need > 0 ? `<em>有人要 ×${o.need}</em>` : ''}</button>`;
+        }).join('')}</div><button class="btn primary pk-done">拿好了</button>`;
+        box.querySelectorAll('.pk-item').forEach((b) => (b.onclick = () => {
+          const o = opts[+b.dataset.i];
+          if (game.takeItem(o.item)) { o.need = Math.max(0, o.need - 1); }
+          if (game.player.hand.length >= game.player.cap) close(); else render();
+        }));
+        box.querySelector('.pk-done').onclick = close;
+      };
+      render();
+    });
+  }
+
+  // ---------- 难度选择 ----------
+  chooseDifficulty() {
+    return new Promise((res) => {
+      const p = this.openModal('diff', `<div class="mg-title">选择难度</div><p class="mg-q">随时可以用右上角的倍速按钮调整快慢。</p>
+        <div class="diff-list">${Object.entries(DIFF).map(([k, d]) => `<button class="diff-card ${k === 'casual' ? 'rec' : ''}" data-k="${k}"><span class="d-ic">${d.icon}</span><b>${d.label}${k === 'casual' ? '<em>推荐</em>' : ''}</b><p>${d.desc}</p><small>房租目标 ¥${d.target} · 一小时≈${d.sec}秒</small></button>`).join('')}</div>`);
+      p.querySelectorAll('.diff-card').forEach((b) => (b.onclick = () => { this.closeModal(); res(b.dataset.k); }));
+    });
+  }
+
+  // ---------- 成就 ----------
+  showAchievements(game, onClose) {
+    const got = game.ach;
+    const n = ACHIEVEMENTS.filter((a) => got[a.id]).length;
+    const p = this.openModal('achp', `<div class="mg-title">🏆 成就 <small>${n}/${ACHIEVEMENTS.length}</small></div>
+      <div class="ach-list">${ACHIEVEMENTS.map((a) => `<div class="ach ${got[a.id] ? 'got' : ''}"><span>${got[a.id] ? a.icon : '🔒'}</span><div><b>${a.name}</b><small>${a.desc}</small></div></div>`).join('')}</div>
+      <button class="btn primary big" id="ach-close">关闭</button>`);
+    $('#ach-close', p).onclick = () => { this.closeModal(); if (onClose) onClose(); };
   }
 
   showTooltip(text, x, y) {
@@ -292,7 +431,7 @@ export class UI {
       const totalOut = r.expense.reduce((a, [, v]) => a + v, 0);
       const exp = r.expense.reduce((m, [k, v]) => { m[k] = (m[k] || 0) + v; return m; }, {});
       const rows = Object.entries(exp).map(([k, v]) => `<tr><td>${k}</td><td class="neg">-¥${v}</td></tr>`).join('');
-      const gap = TARGET - r.money;
+      const gap = game.target - r.money;
       const p = this.openModal('report', `
         <div class="rp-head"><div class="rp-day">第 ${r.day} 天 · 营业日报</div><div class="rp-sub">${game.dayDef.date}</div></div>
         <div class="rp-grid">
@@ -311,7 +450,7 @@ export class UI {
           ${rows || '<tr><td>无</td><td></td></tr>'}
           <tr class="t"><td>合计</td><td>¥${totalIn - totalOut}</td></tr>
         </table>
-        <div class="rp-goal">${gap > 0 ? `距离交房租（¥${TARGET}）还差 <b>¥${gap}</b>，剩余 <b>${10 - r.day}</b> 天` : '<b class="pos">房租的钱已经攒够了！</b>守住口碑，迎接最后的挑战。'}</div>
+        <div class="rp-goal">${gap > 0 ? `距离交房租（¥${game.target}）还差 <b>¥${gap}</b>，剩余 <b>${10 - r.day}</b> 天` : '<b class="pos">房租的钱已经攒够了！</b>守住口碑，迎接最后的挑战。'}</div>
         <div class="rp-tip">${r.timeouts > 3 ? '⚠ 今天有 ' + r.timeouts + ' 次客人需求没有及时处理，考虑雇人帮忙。' : r.lost > 5 ? '⚠ 今天流失了 ' + r.lost + ' 位客人——机位不够或排队太久。可以添置电脑，或者适当涨价。' : '👍 今天干得不错。'}</div>
         <button class="btn primary big" id="rp-next">进入夜间经营 →</button>`);
       $('#rp-next', p).onclick = () => { this.closeModal(); res(); };
@@ -328,7 +467,15 @@ export class UI {
         const st = game.state;
         const t = SHOP[tab];
         let body = '';
-        if (t.tab === '定价') {
+        if (t.tab === '技能') {
+          const [xpIn, xpNeed] = game.levelProgress();
+          body = `<div class="skill-head"><b>网管 Lv.${game.level}</b><div class="xpbar"><i style="width:${xpIn / xpNeed * 100}%"></i></div><small>经验 ${xpIn}/${xpNeed} · 可用技能点 <b class="sp">${game.freeSP}</b></small><p class="desc">开卡、送货、修电脑、拖地都能获得经验，升级得到技能点。</p></div>` +
+            Object.entries(SKILLS).map(([k, sk]) => {
+              const lv = st.skills[k] || 0;
+              const can = game.freeSP > 0 && lv < sk.max;
+              return `<div class="item"><div class="ic">${sk.icon}</div><div class="info"><b>${sk.name} <span class="pips">${'●'.repeat(lv)}${'○'.repeat(sk.max - lv)}</span></b><p>${sk.desc}</p></div><button class="btn ${can ? 'primary' : ''}" data-skill="${k}" ${can ? '' : 'disabled'}>${lv >= sk.max ? '已满级' : '学习'}</button></div>`;
+            }).join('');
+        } else if (t.tab === '定价') {
           body = `<div class="price-box">
             <label>普通区价格 <b id="pv">${st.price}</b> 元/小时</label>
             <input type="range" min="2" max="6" step="1" value="${st.price}" id="pr">
@@ -352,10 +499,16 @@ export class UI {
           <div class="sh-head"><div><div class="sh-title">夜间经营</div><div class="sh-sub">第 ${st.day} 天打烊后 · 规划明天</div></div><div class="sh-money">¥${st.money.toLocaleString()}</div></div>
           <div class="tabs">${SHOP.map((s, i) => `<button class="${i === tab ? 'on' : ''}" data-tab="${i}">${s.tab}</button>`).join('')}</div>
           <div class="sh-body">${body}</div>
-          <div class="sh-foot"><div class="sh-goal">房租目标 ¥${TARGET} · ${TARGET - st.money > 0 ? '还差 ¥' + (TARGET - st.money) : '已达成'}</div><button class="btn primary big" id="sh-next">睡觉，迎接第 ${st.day + 1} 天 →</button></div>
+          <div class="sh-foot"><div class="sh-goal">房租目标 ¥${game.target} · ${game.target - st.money > 0 ? '还差 ¥' + (game.target - st.money) : '已达成'}</div><button class="btn primary big" id="sh-next">睡觉，迎接第 ${st.day + 1} 天 →</button></div>
         </div>`;
         this.modal.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { tab = +b.dataset.tab; render(); }));
-        this.modal.querySelectorAll('.item button').forEach((b) => (b.onclick = () => {
+        this.modal.querySelectorAll('[data-skill]').forEach((b) => (b.onclick = () => {
+          if (game.freeSP <= 0) return;
+          st.skills[b.dataset.skill] = (st.skills[b.dataset.skill] || 0) + 1;
+          game.audio.play('ok');
+          render();
+        }));
+        this.modal.querySelectorAll('.item button[data-id]').forEach((b) => (b.onclick = () => {
           const it = SHOP[tab].items.find((x) => x.id === b.dataset.id);
           const price = it.price(game);
           if (st.money < price) return;
@@ -379,11 +532,13 @@ export class UI {
   repairGame(game, seat) {
     return new Promise((res) => {
       const cs = REPAIR_CASES[Math.floor(Math.random() * REPAIR_CASES.length)];
-      const wrong = shuffle(REPAIR_CASES.filter((c) => c !== cs).map((c) => c.ok)).slice(0, 2);
+      const skill = game.skill('repair');
+      const wrong = shuffle(REPAIR_CASES.filter((c) => c !== cs).map((c) => c.ok)).slice(0, Math.max(0, 2 - skill));
       const opts = shuffle([cs.ok, ...wrong, '用力拍一拍机箱']);
       const p = this.openModal('mini repair', `
         <div class="mg-title">💻 ${seat.label} 号机故障</div>
         <div class="crt-sym"><div class="scr">${cs.sym}</div></div>
+        ${skill ? `<p class="mg-tip">🔧 巧手 Lv.${skill}：已帮你排除了 ${skill} 个明显不对的修法</p>` : ''}
         <p class="mg-q">客人抱怨：<i>“${cs.sym.slice(0, 18)}……网管快来看看！”</i><br>你打算怎么处理？</p>
         <div class="mg-opts">${opts.map((o, i) => `<button class="btn" data-i="${i}">${o}</button>`).join('')}</div>
         <div class="mg-status"></div>
@@ -397,7 +552,8 @@ export class UI {
         status.innerHTML = '<div class="work">🔧 处理中<span class="dots"></span></div><div class="pbar"><i></i></div>';
         game.audio.play('type');
         await sleep(1200);
-        const luck = o === '用力拍一拍机箱' && Math.random() < 0.35;
+        const luck = o === '用力拍一拍机箱' && Math.random() < 0.35 + 0.15 * skill;
+        if (luck) game.stat('slap');
         if (o === cs.ok || luck) {
           status.innerHTML = luck ? '<b class="pos">“砰！”……居然好了？！玄学修电脑！</b>' : '<b class="pos">✔ 搞定！屏幕亮了。</b>';
           game.audio.play('ok');
