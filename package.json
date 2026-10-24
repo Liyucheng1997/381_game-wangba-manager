@@ -1,0 +1,19 @@
+{
+  "name": "netcafe-simulator",
+  "version": "1.0.0",
+  "repository": "github:Liyucheng1997/381_game-wangba-manager",
+  "private": true,
+  "type": "module",
+  "description": "网管日记：2006 —— 网吧模拟器",
+  "scripts": {
+    "dev": "vite --port 5173",
+    "build": "vite build",
+    "preview": "vite preview --port 5173"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.10"
+  }
+}

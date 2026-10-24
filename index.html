@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>网管日记 2006 · 极速网吧模拟器</title>
+</head>
+<body>
+  <div id="app">
+    <div id="bubbles"></div>
+    <div id="floats"></div>
+    <div id="player-progress"><i></i></div>
+
+    <div id="hud">
+      <div class="topbar">
+        <div class="brand"><span class="logo">极速</span>网吧</div>
+        <div class="sep"></div>
+        <div class="date"><b id="h-day">第1天</b><span id="h-date"></span></div>
+        <div class="clock" id="h-clock">09:00</div>
+        <div class="sep"></div>
+        <div class="stat money"><span class="yen">¥</span><b id="h-money">0</b><small id="h-target"></small></div>
+        <div class="stat rep"><span>口碑</span><div class="bar"><i id="h-rep"></i></div><b id="h-repv">50</b></div>
+        <div class="stat"><span>在线</span><b id="h-online">0/0</b></div>
+        <div class="stat"><span>排队</span><b id="h-queue">0</b></div>
+        <div class="grow"></div>
+        <div id="speed"><button data-s="0" title="暂停 (P)">⏸</button><button data-s="1" title="正常 (1)">▶</button><button data-s="2" title="2倍速 (2)">⏩</button><button data-s="3" title="3倍速 (3)">⏭</button></div>
+        <button id="btn-mute" class="iconbtn" title="静音">🔊</button>
+        <button id="btn-help2" class="iconbtn" title="帮助">❔</button>
+      </div>
+      <div id="tasks"><div class="tasks-h">待办事项</div><div id="tasks-list"></div></div>
+      <div id="bottombar"><div id="hand"></div><div id="stock"></div></div>
+      <div id="hint"></div>
+    </div>
+
+    <div id="tooltip"></div>
+    <div id="toasts"></div>
+
+    <div id="dialog">
+      <img class="portrait" alt="" />
+      <div class="box">
+        <div class="who"><span class="name"></span><span class="title"></span></div>
+        <div class="text"></div>
+        <div class="choices"></div>
+        <div class="next">▼</div>
+      </div>
+    </div>
+
+    <div id="modal"></div>
+    <div id="daytitle"></div>
+    <div id="pause-mask"><div>⏸ 已暂停<small>点击任意处继续</small></div></div>
+
+    <div id="title-screen">
+      <div class="t-inner">
+        <div class="t-year">2006 · 青石县</div>
+        <h1 class="t-logo"><span>网管</span>日记</h1>
+        <div class="t-sub">极速网吧模拟器</div>
+        <p class="t-desc">舅舅住院，把网吧交给了高考落榜的你。<br>十天后，要交上六千块房租——否则，这家店就要易主。</p>
+        <div class="t-btns">
+          <button class="btn primary big" id="btn-new">新的开始</button>
+          <button class="btn big" id="btn-continue" style="display:none">继续上一天</button>
+          <button class="btn ghost" id="btn-help">操作说明</button>
+        </div>
+        <div class="t-foot">建议使用电脑浏览器 · 戴上耳机体验键盘声与“嘀嘀嘀”</div>
+      </div>
+    </div>
+
+    <div id="help">
+      <div class="panel">
+        <h2>网管操作手册</h2>
+        <div class="help-grid">
+          <div><b>🖱 左键</b>点地面走路；点客人、座位、冰柜等直接交互</div>
+          <div><b>🖱 右键拖动</b>旋转视角；<b>滚轮</b>缩放</div>
+          <div><b>⌨ WASD</b>直接控制网管走动</div>
+          <div><b>E</b>快速回前台开卡　<b>P</b>暂停　<b>1/2/3</b>倍速</div>
+          <div><b>🪪 开卡</b>客人在前台排队，点他开卡收钱。❓表示看着面嫩，可以查身份证</div>
+          <div><b>🍜 泡面</b>货架拿面 → 饮水机加热水 → 送到座位</div>
+          <div><b>🥤 饮料</b>冰柜拿饮料送过去；<b>🎧 耳机</b>耳机架拿新的</div>
+          <div><b>💻 故障</b>走到座位，根据症状选择正确修法（拍机箱有时也管用）</div>
+          <div><b>🚬 抽烟</b>去劝阻；<b>💢 吵架</b>去调解；<b>⏰ 续费</b>去收钱</div>
+          <div><b>🧹 垃圾</b>客人走后点座位收拾，脏桌没人爱坐</div>
+          <div><b>📶 断网</b>去收银台点路由器重启</div>
+          <div><b>🌙 夜间</b>打烊后可添置电脑、升级设备、雇人、进货、调价</div>
+        </div>
+        <p class="help-goal">目标：第十天晚上，账上要有 <b>¥6000</b> 交房租。口碑越高，客人越多。</p>
+        <button class="btn primary close">知道了</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
